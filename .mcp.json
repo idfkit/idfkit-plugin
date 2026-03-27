@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "idfkit": {
+      "command": "uvx",
+      "args": ["idfkit-mcp"]
+    }
+  }
+}

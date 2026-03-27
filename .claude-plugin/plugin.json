@@ -1,0 +1,14 @@
+{
+  "name": "idfkit",
+  "version": "0.1.0",
+  "description": "EnergyPlus building energy modeling plugin — MCP server, LSP, skills, and agents for creating, validating, and simulating building energy models with idfkit",
+  "author": {
+    "name": "idfkit",
+    "email": "developers@idfkit.com",
+    "url": "https://idfkit.com"
+  },
+  "homepage": "https://idfkit.com",
+  "repository": "https://github.com/idfkit/idfkit-plugin",
+  "license": "Apache-2.0",
+  "keywords": ["energyplus", "idfkit", "building-energy", "simulation", "hvac", "mcp", "lsp"]
+}
