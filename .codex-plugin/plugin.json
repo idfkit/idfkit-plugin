@@ -1,0 +1,45 @@
+{
+  "name": "idfkit",
+  "version": "0.1.0",
+  "description": "EnergyPlus building energy modeling plugin with skills and MCP tooling for creating, validating, and simulating IDF models.",
+  "author": {
+    "name": "idfkit",
+    "email": "developers@idfkit.com",
+    "url": "https://idfkit.com"
+  },
+  "homepage": "https://idfkit.com",
+  "repository": "https://github.com/idfkit/idfkit-plugin",
+  "license": "Apache-2.0",
+  "keywords": [
+    "energyplus",
+    "idfkit",
+    "building-energy",
+    "simulation",
+    "hvac",
+    "mcp",
+    "idf"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "idfkit",
+    "shortDescription": "Create, validate, and simulate EnergyPlus models",
+    "longDescription": "Use idfkit to create new EnergyPlus building models, inspect and validate IDF content, manage weather data, and run simulations through a local MCP server and focused modeling skills.",
+    "developerName": "idfkit",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://idfkit.com",
+    "privacyPolicyURL": "https://idfkit.com",
+    "termsOfServiceURL": "https://idfkit.com",
+    "defaultPrompt": [
+      "Create a new EnergyPlus model for a small office in Boston",
+      "Validate this IDF and explain the blocking errors",
+      "Run an annual simulation and summarize the results"
+    ],
+    "brandColor": "#1D4ED8",
+    "screenshots": []
+  }
+}
