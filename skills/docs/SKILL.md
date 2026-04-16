@@ -10,7 +10,7 @@ Look up: $ARGUMENTS
 
 ## Steps
 
-1. **Quick reference** — If the query is an object type name, use `lookup_documentation` first to get direct URLs to:
+1. **Quick reference** — If the query is an object type name, read the `idfkit://docs/{object_type}` resource to get direct URLs to:
    - I/O Reference (field-level documentation)
    - Engineering Reference (algorithms and theory)
    - docs.idfkit.com search results

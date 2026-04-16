@@ -10,9 +10,9 @@ Validate the currently loaded model. Optional filter: $ARGUMENTS
 
 ## Steps
 
-1. **Run validation** — Use `validate_model` (optionally with `object_types` filter if the user specified specific types)
+1. **Run validation** — Use `validate_model` (optionally with `object_types` filter if the user specified specific types). Reference integrity is checked by default (`check_references=True`).
 
-2. **Check references** — Use `check_references` to find dangling references (objects referencing non-existent objects)
+2. **Check model integrity** — Use `check_model_integrity` for domain-level QA: zones without surfaces, missing required controls, orphan schedules, boundary condition mismatches, fenestration host errors, and HVAC zone reference issues.
 
 3. **Categorize issues** by severity and type:
    - **Critical errors**: Missing required fields, invalid field types, unknown object types

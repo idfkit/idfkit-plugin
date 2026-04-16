@@ -12,7 +12,7 @@ Compare models: $ARGUMENTS
 
 ## Steps
 
-1. **Load baseline** — Use `load_model` to open the baseline (existing conditions) model. Use `get_model_summary` to document its configuration.
+1. **Load baseline** — Use `load_model` to open the baseline (existing conditions) model. Read the `idfkit://model/summary` resource to document its configuration.
 
 2. **Document baseline** — Record key properties:
    - Envelope: wall/roof/window U-values and SHGC (inspect Construction and Material objects)
@@ -21,18 +21,18 @@ Compare models: $ARGUMENTS
    - Schedules: occupancy and operating hours
    - Weather file and location
 
-3. **Simulate baseline** — Run `run_simulation` and capture results with `get_results_summary`. Record:
+3. **Simulate baseline** — Run `run_simulation` and read the `idfkit://simulation/results` resource. Use `analyze_peak_loads` for peak decomposition. Record:
    - Annual energy by end-use (heating, cooling, lighting, equipment, fans, pumps)
-   - Peak heating and cooling loads
+   - Peak heating and cooling loads with component breakdown
    - Unmet hours
 
-4. **Load proposed** — Clear session with `clear_session`, then `load_model` the proposed model. Use `get_model_summary`.
+4. **Load proposed** — Clear session with `clear_session`, then `load_model` the proposed model. Read the `idfkit://model/summary` resource.
 
 5. **Document changes** — Compare key differences from baseline:
    - What was changed (insulation, windows, HVAC equipment, controls, etc.)
    - Quantify the parameter changes
 
-6. **Simulate proposed** — Run `run_simulation` and capture results.
+6. **Simulate proposed** — Run `run_simulation` and read the `idfkit://simulation/results` resource. Use `analyze_peak_loads`.
 
 7. **Compare and report**:
    - **Energy savings**: kWh and % reduction by end-use category

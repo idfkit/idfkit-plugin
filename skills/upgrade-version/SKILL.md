@@ -11,7 +11,7 @@ Upgrade: $ARGUMENTS
 
 ## Steps
 
-1. **Load current model** — Use `load_model` with the source file. Note the current version from `get_model_summary`.
+1. **Load current model** — Use `load_model` with the source file. Read the `idfkit://model/summary` resource to note the current version.
 
 2. **Identify target version** — If not specified, default to the latest supported version (25.2.0). Confirm with the user.
 

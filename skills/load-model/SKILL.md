@@ -12,7 +12,7 @@ Load the model at: $ARGUMENTS
 
 1. **Load** — Use `load_model` with the file path. If no path is provided, ask the user which file to open.
 
-2. **Summarize** — Use `get_model_summary` to get the overview, then present:
+2. **Summarize** — Read the `idfkit://model/summary` resource to get the overview, then present:
    - **Version**: EnergyPlus version
    - **Building**: Name, north axis, terrain
    - **Zones**: Count and names
@@ -24,6 +24,10 @@ Load the model at: $ARGUMENTS
    - **Weather**: Assigned weather file (if any)
    - **Simulation period**: RunPeriod and sizing periods
 
-3. **Highlight issues** — If anything looks incomplete or unusual (e.g., no HVAC, no weather file, missing output variables), mention it proactively.
+3. **Zone details** — Use `get_zone_properties` for detailed zone geometry, surface inventory, constructions, and HVAC connections.
 
-4. **Suggest next steps** — Based on the model state, suggest what the user might want to do next (validate, simulate, add systems, etc.).
+4. **Visual inspection** — Use `view_geometry` to show an interactive 3D view of the building for quick spatial orientation.
+
+5. **Highlight issues** — If anything looks incomplete or unusual (e.g., no HVAC, no weather file, missing output variables), mention it proactively.
+
+6. **Suggest next steps** — Based on the model state, suggest what the user might want to do next (validate, simulate, add systems, etc.).
