@@ -13,14 +13,7 @@ else
     issues+=("uvx is not installed. Install uv (https://docs.astral.sh/uv/getting-started/installation/) to use the idfkit MCP server and LSP.")
 fi
 
-# 2. Check idfkit-mcp availability (don't actually install, just check)
-if command -v uvx &>/dev/null; then
-    if uvx --help &>/dev/null 2>&1; then
-        info+=("idfkit-mcp: will be available via uvx")
-    fi
-fi
-
-# 3. Look for EnergyPlus installation
+# 2. Look for EnergyPlus installation
 ep_dir=""
 
 # Check user config first
@@ -37,22 +30,16 @@ if [[ -z "$ep_dir" && -n "${ENERGYPLUS_DIR:-}" ]]; then
     fi
 fi
 
-# Auto-detect on macOS
+# Auto-detect (macOS + Linux standard locations). Glob expansion is lexical, so
+# EnergyPlus-9.6.0 would sort after EnergyPlus-25.2.0 — pick the highest version
+# explicitly with `sort -V`.
 if [[ -z "$ep_dir" ]]; then
-    for d in /Applications/EnergyPlus-*/; do
-        if [[ -d "$d" ]]; then
-            ep_dir="$d"
-        fi
-    done
-fi
-
-# Auto-detect on Linux
-if [[ -z "$ep_dir" ]]; then
-    for d in /usr/local/EnergyPlus-*/; do
-        if [[ -d "$d" ]]; then
-            ep_dir="$d"
-        fi
-    done
+    shopt -s nullglob
+    ep_candidates=(/Applications/EnergyPlus-*/ /usr/local/EnergyPlus-*/)
+    shopt -u nullglob
+    if (( ${#ep_candidates[@]} > 0 )); then
+        ep_dir=$(printf '%s\n' "${ep_candidates[@]}" | sort -V | tail -n1)
+    fi
 fi
 
 if [[ -n "$ep_dir" ]]; then
