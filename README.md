@@ -14,7 +14,14 @@ Claude Code, Cursor, Copilot, Gemini, Codex, and any MCP-capable client.
 | **Workflow skills** | Task playbooks that orchestrate the MCP tools: `simulate`, `validate`, `new-model`, `load-model`, `energy-audit`, `weather`, `upgrade-version`, `idf-conventions`, `docs`. |
 | **Agents** | Focused sub-agents: `energy-modeler`, `envelope-analyst`, `hvac-designer`. |
 | **Commands & hooks** | `/quick-sim` slash command; context hooks that nudge agents toward the structured MCP tools when they touch `.idf` / `.epJSON` / `.epw` / `.ddy` files. |
-| **LSP** | EnergyPlus language support via `.lsp.json`. |
+| **LSP** | Python LSP for idfkit-based code (`idfkit-lsp`) via `.lsp.json`. |
+
+> **Note on the LSP.** `idfkit-lsp` is a language server for *Python code that
+> imports idfkit* — it does **not** provide an IDF/epJSON language server. Because
+> it registers `.py` → `python`, the host attaches it to **every** Python file in
+> the project, where it coexists with (and may compete with) your primary Python
+> LSP such as Pylance, pyright, or ruff-lsp. If your editor supports scoping a
+> server by workspace or activation pattern, narrow it to idfkit projects.
 
 ## Two contexts, two surfaces
 
