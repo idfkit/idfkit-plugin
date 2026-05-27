@@ -8,6 +8,9 @@ argument-hint: "[search-query]"
 
 Look up: $ARGUMENTS
 
+> Use `docs` for *EnergyPlus object* documentation (fields, algorithms, behavior) via the MCP server;
+> use `developing-with-idfkit` for *writing idfkit Python* against the library.
+
 ## Steps
 
 1. **Quick reference** — If the query is an object type name, read the `idfkit://docs/{object_type}` resource to get direct URLs to:

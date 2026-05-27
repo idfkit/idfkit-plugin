@@ -28,6 +28,16 @@ Load the model at: $ARGUMENTS
 
 4. **Visual inspection** — Use `view_geometry` to show an interactive 3D view of the building for quick spatial orientation.
 
-5. **Highlight issues** — If anything looks incomplete or unusual (e.g., no HVAC, no weather file, missing output variables), mention it proactively.
+5. **Version check** — If the model's `Version` differs from the installed/supported EnergyPlus, flag it
+   and suggest `migrate_model` (the `upgrade-version` skill) before simulating — running against a
+   mismatched version can fail or silently misbehave.
 
-6. **Suggest next steps** — Based on the model state, suggest what the user might want to do next (validate, simulate, add systems, etc.).
+6. **Highlight issues** — If anything looks incomplete or unusual, mention it proactively. Surface
+   simulation-readiness gaps you can already see from the summary, e.g.:
+   - autosized HVAC but no `SizingPeriod:DesignDay` (or `SimulationControl` sizing flags off) — sizing
+     can't run, so capacities resolve to zero
+   - no weather file or `Site:Location` assigned
+   - missing `Site:GroundTemperature:*` for models with ground-coupled surfaces
+   - no output variables/meters requested
+
+7. **Suggest next steps** — Based on the model state, suggest what the user might want to do next (validate, simulate, migrate, add systems, etc.).
