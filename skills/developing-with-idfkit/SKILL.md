@@ -32,8 +32,11 @@ here are about the library API, not the MCP tool surface.
 Run the discovery script with the user's project directory:
 
 ```bash
-python <SKILL_DIR>/scripts/discover.py --project-dir <USER_PROJECT_DIR>
+python ${CLAUDE_SKILL_DIR}/scripts/discover.py --project-dir <USER_PROJECT_DIR>
 ```
+
+Use the literal `${CLAUDE_SKILL_DIR}` token so the command matches the `allowed-tools` permission
+pattern and runs without a prompt.
 
 The script prints either:
 
@@ -43,7 +46,7 @@ The script prints either:
 - **An `ERROR:` block on stderr** (non-zero exit). Follow the printed instructions
   (install or upgrade idfkit, activate the right environment) and re-run.
 
-`<SKILL_DIR>` is the directory containing this file; `<USER_PROJECT_DIR>` is the
+`${CLAUDE_SKILL_DIR}` resolves to the directory containing this file; `<USER_PROJECT_DIR>` is the
 absolute path to the user's project. Passing `--project-dir` matters because the
 script resolves `.venv`, `../.venv`, `<git-root>/.venv`, `Pipfile`, `poetry.lock`,
 `pdm.lock`, and `uv.lock` relative to it — so it inspects the user's project

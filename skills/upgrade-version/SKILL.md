@@ -1,6 +1,6 @@
 ---
 name: upgrade-version
-description: "Upgrade an EnergyPlus model from one version to another, handling object type changes and deprecated fields"
+description: "Forward-migrate an EnergyPlus model to a newer version using the official IDFVersionUpdater transition toolchain (migrate_model). Forward-only."
 disable-model-invocation: true
 argument-hint: "[model-path] [target-version]"
 ---
@@ -9,34 +9,50 @@ argument-hint: "[model-path] [target-version]"
 
 Upgrade: $ARGUMENTS
 
+> Migration runs the official EnergyPlus **Transition** programs via `migrate_model`.
+> It is **forward-only** (target must be >= current) and **requires EnergyPlus installed**
+> — the transition binaries ship with it. Do **not** migrate by hand-copying objects into a
+> `new_model`: field reorders/renames, split or merged object types, and changed defaults make a
+> manual copy silently incorrect (it can still pass schema validation while being physically wrong).
+
 ## Steps
 
-1. **Load current model** — Use `load_model` with the source file. Read the `idfkit://model/summary` resource to note the current version.
+1. **Load** — Use `load_model` with the source file. Read the `idfkit://model/summary` resource and
+   note the current version.
 
-2. **Identify target version** — If not specified, default to the latest supported version (25.2.0). Confirm with the user.
+2. **Resolve target** — If `target_version` is not given, default to the latest supported version
+   (currently 26.1.0) and confirm with the user. `migrate_model` defaults to the installed
+   EnergyPlus version when `target_version` is omitted.
 
-3. **Research changes** — Use `search_docs` and `get_doc_section` to understand what changed between versions. Key areas:
-   - Renamed or removed object types
-   - New required fields
-   - Changed field names or semantics
-   - Deprecated features
+3. **Preflight the direction** — Migration is forward-only:
+   - `target == current`: nothing to do — report and stop.
+   - `target < current`: **stop**. EnergyPlus Transition has no downgrade path; tell the user and exit.
+   - `target > current`: proceed.
 
-4. **Create target model** — Use `new_model` with the target version.
+4. **Migrate** — Use `migrate_model(target_version=<target>)`. This drives the full IDFVersionUpdater
+   transition chain (one binary per version step) and replaces the in-memory model on success.
+   - If it fails because EnergyPlus can't be found, instruct the user to install EnergyPlus or set
+     `$ENERGYPLUS_DIR` (or pass `energyplus_dir=`). Do **not** fall back to a manual object copy.
 
-5. **Migrate objects** — For each object type in the source model:
-   - Use `list_objects` to get all objects of that type
-   - Use `describe_object_type` on the target version to verify field compatibility
-   - Use `batch_add_objects` to add compatible objects
-   - Flag objects that need manual attention (changed schemas, removed types)
+5. **Read the migration report** — Read the `idfkit://migration/report` resource for the per-step
+   stdout/stderr, the transition audit, and the structural diff (object types added/removed, per-type
+   field changes). Surface any transition warnings to the user.
 
-6. **Validate** — Run `validate_model` on the new model and fix any version-specific issues.
+6. **Validate** — Run `validate_model` then `check_model_integrity`. These confirm the migrated model
+   is well-formed (schema + domain QA). Note that passing them does **not** guarantee a successful
+   simulation — if EnergyPlus is available, a `run_simulation` smoke test is the definitive check.
 
-7. **Save** — Use `save_model` to write the upgraded model.
+7. **Save** — `migrate_model` leaves `state.file_path` pointing at the original source, so a bare
+   `save_model` would overwrite it. Save to a new versioned path to preserve the source, e.g.
+   `save_model(file_path="<name>_v<target>.idf")`.
 
-8. **Report** — Summarize:
-   - Objects migrated successfully
-   - Objects that needed modification
-   - Any objects that could not be migrated (removed types)
-   - Recommendations for manual review
+8. **Report** — Summarize from authoritative sources, not guesswork:
+   - source and target versions, and the transition chain that ran (from the report),
+   - structural diff highlights from `idfkit://migration/report`,
+   - `validate_model` / `check_model_integrity` results,
+   - the saved path,
+   - any transition-emitted warnings that need manual review.
 
-**Supported versions**: 8.9.0, 9.0.1, 9.1.0, 9.2.0, 9.3.0, 9.4.0, 9.5.0, 9.6.0, 22.1.0, 22.2.0, 23.1.0, 23.2.0, 24.1.0, 24.2.0, 25.1.0, 25.2.0
+**Supported range**: 8.9.0 through the latest supported version (currently 26.1.0). EnergyPlus
+switched from SemVer to CalVer at 9.6.0 → 22.1.0, so there is no 10.x; the achievable range is
+ultimately bounded by the transition binaries shipped with the installed EnergyPlus.

@@ -9,24 +9,12 @@ paths: "**/*.idf, **/*.epJSON, **/*.epjson, **/*.py"
 
 ## idfkit MCP Tools & Resources
 
-You have access to the idfkit MCP server with 40 tools and 11 resources across 10 categories:
+This skill assumes the idfkit MCP server is available. Don't rely on a memorized tool count — consult
+the **live tool list** and the server's own startup instructions for the authoritative set. The tools
+span schema introspection, model read/write, validation + integrity, simulation + analysis, weather,
+documentation, and version migration.
 
-### Tools
-
-**Schema** (4): `list_object_types`, `describe_object_type`, `search_schema`, `get_available_references`
-**Read** (5): `load_model`, `list_objects`, `search_objects`, `convert_osm_to_idf`, `get_change_log`
-**Write** (9): `new_model`, `add_object`, `batch_add_objects`, `update_object`, `remove_object`, `rename_object`, `duplicate_object`, `save_model`, `clear_session`
-**Validation** (2): `validate_model` (includes reference checking via `check_references` parameter), `check_model_integrity`
-**Simulation** (8): `run_simulation`, `list_output_variables`, `query_timeseries`, `query_simulation_table`, `list_simulation_reports`, `view_simulation_report`, `export_timeseries`, `analyze_peak_loads`
-**Weather** (2): `search_weather_stations`, `download_weather_file`
-**Documentation** (2): `search_docs`, `get_doc_section`
-**Zone** (1): `get_zone_properties`
-**Geometry** (1): `view_geometry`
-**Schedules** (1): `view_schedules`
-
-### Resources
-
-Read these via MCP resource URIs for structured data:
+Structured state is exposed as read-only `idfkit://…` resources you can read at any time, including:
 
 - `idfkit://model/summary` — version, zones, object counts, and groups for the loaded model
 - `idfkit://model/objects/{object_type}/{name}` — all field values for a specific object
@@ -36,6 +24,9 @@ Read these via MCP resource URIs for structured data:
 - `idfkit://simulation/results` — energy metrics, errors, and tables from the last simulation
 - `idfkit://simulation/peak-loads` — peak heating/cooling load decomposition with QA flags
 - `idfkit://simulation/report` — full tabular simulation report organized by section and table
+- `idfkit://migration/report` — per-step transition output and structural diff after `migrate_model`
+
+The server may expose more — treat its live instructions as authoritative rather than this list.
 
 ## Key Conventions
 
@@ -47,7 +38,7 @@ Read these via MCP resource URIs for structured data:
 ### Field Names
 - idfkit uses snake_case Python field names: `direction_of_relative_north`, `ceiling_height`
 - The MCP tools accept these snake_case names in the `fields` parameter
-- Extensible fields use numbered patterns: `vertex_1_x_coordinate`, `vertex_2_x_coordinate`, etc.
+- Extensible groups use a structured array under a wrapper key — e.g. `BuildingSurface:Detailed` takes `vertices: [{vertex_x_coordinate, vertex_y_coordinate, vertex_z_coordinate}, …]`. (Flat numbered keys like `vertex_1_x_coordinate` are a deprecated compat shim that emits warnings — don't use them.) Check `describe_object_type`'s `extensible_group` for the exact key and item fields.
 
 ### Workflow Best Practices
 1. **Always call `describe_object_type` before creating objects** — know valid fields, constraints, and defaults
@@ -60,9 +51,9 @@ Read these via MCP resource URIs for structured data:
 8. **Read resources for object data** — use `idfkit://model/objects/{type}/{name}` to inspect objects and `idfkit://model/references/{name}` to check references
 
 ### Version Support
-- Supported EnergyPlus versions: 8.9.0 through 25.2.0 (16 versions)
-- Default version for new models: latest (25.2.0)
-- Schemas are bundled — no EnergyPlus installation needed for editing, only for simulation
+- Supported EnergyPlus versions: 8.9.0 through the latest supported (currently 26.1.0); idfkit exposes the newest as `LATEST_VERSION`
+- Default version for new models: the latest supported version
+- Schemas are bundled — no EnergyPlus installation needed for editing or schema validation; only simulation and version migration require an EnergyPlus install
 
 ### Common Object Categories
 - **Simulation Parameters**: SimulationControl, Timestep, RunPeriod, Building
