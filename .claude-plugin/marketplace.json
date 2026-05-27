@@ -22,7 +22,7 @@
       },
       "homepage": "https://idfkit.com",
       "repository": "https://github.com/idfkit/idfkit-plugin",
-      "license": "Apache-2.0",
+      "license": "MIT",
       "keywords": [
         "energyplus",
         "idfkit",
