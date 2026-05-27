@@ -5,9 +5,11 @@ Usage:
     python scripts/discover.py [--project-dir PATH]
 
 When --project-dir is given, the script resolves `.venv`, `../.venv`,
-`<git-root>/.venv`, `Pipfile`, `poetry.lock`, `pdm.lock`, and `uv.lock` relative
-to that path (so its checks land on the user's project rather than on the
-script's installed location).
+`<git-root>/.venv`, `Pipfile`, and the `poetry.lock`/`pdm.lock`/`uv.lock`
+lockfiles (each paired with a `pyproject.toml`) relative to that path (so its
+checks land on the user's project rather than on the script's installed
+location). An active conda `base` environment is ignored, since `CONDA_PREFIX`
+is exported merely by initializing conda.
 
 Exit codes:
     0 - success; prints the absolute path to the bundled SKILL.md on stdout.
@@ -99,7 +101,14 @@ def detect_interpreter(project_dir: Path) -> tuple[list[str], str] | None:
             return [str(py)], "venv-git-root"
 
     conda = os.environ.get("CONDA_PREFIX")
-    if conda:
+    # CONDA_PREFIX is exported pointing at `base` whenever conda is merely
+    # initialized, even with no project env active. Firing on that would advise
+    # `conda install ... idfkit` into base — the anti-pattern this branch avoids.
+    if (
+        conda
+        and Path(conda).name != "base"
+        and os.environ.get("CONDA_DEFAULT_ENV") != "base"
+    ):
         py = find_venv_python(Path(conda))
         if py:
             return [str(py)], "conda"
@@ -107,13 +116,30 @@ def detect_interpreter(project_dir: Path) -> tuple[list[str], str] | None:
     if shutil.which("pipenv") and (project_dir / "Pipfile").is_file():
         return ["pipenv", "run", "python"], "pipenv"
 
-    if shutil.which("poetry") and (project_dir / "poetry.lock").is_file():
+    # poetry/pdm/uv only manage a project when a manifest is present. A bare
+    # lockfile makes them emit "could not find a pyproject.toml" on stderr
+    # instead of letting us give install advice, so require the manifest too.
+    has_pyproject = (project_dir / "pyproject.toml").is_file()
+
+    if (
+        shutil.which("poetry")
+        and (project_dir / "poetry.lock").is_file()
+        and has_pyproject
+    ):
         return ["poetry", "run", "python"], "poetry"
 
-    if shutil.which("pdm") and (project_dir / "pdm.lock").is_file():
+    if (
+        shutil.which("pdm")
+        and (project_dir / "pdm.lock").is_file()
+        and has_pyproject
+    ):
         return ["pdm", "run", "python"], "pdm"
 
-    if shutil.which("uv") and (project_dir / "uv.lock").is_file():
+    if (
+        shutil.which("uv")
+        and (project_dir / "uv.lock").is_file()
+        and has_pyproject
+    ):
         return ["uv", "run", "--quiet", "python"], "uv"
 
     for name in ("python3", "python"):
