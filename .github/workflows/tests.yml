@@ -21,3 +21,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Run discovery tests
         run: python -m unittest tests.discovery.test_discover -v
+
+  consumer-register:
+    # This repository is `idfkit-plugin` in the consumer register, governance/consumers.toml in
+    # idfkit-conformance (feature 004). The called workflow asserts that the register still
+    # describes it: .mcp.json pins idfkit-mcp exactly, and .lsp.json is the recorded, unpinned
+    # exception while idfkit-lsp is unpublished. The tag is written twice because a called workflow
+    # cannot see its own ref; the called workflow refuses the run unless they match.
+    uses: idfkit/idfkit-conformance/.github/workflows/check-consumer.yml@governance-2026.18
+    with:
+      governance_level: governance-2026.18

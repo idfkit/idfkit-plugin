@@ -1,0 +1,169 @@
+name: bump-idfkit
+
+# Adopt a published idfkit level, as a pull request (feature 004 of the unification, US4).
+#
+# idfkit's notify-downstream.yml dispatches this in wave 2, after the consumers that resolve idfkit
+# directly, because the plugin reaches idfkit only through the two servers it hands to an editor.
+# It never pins idfkit. It pins idfkit-mcp in .mcp.json, and idfkit follows from that release.
+#
+# ORDER IS ENFORCED HERE, NOT ASSUMED (FR-020). idfkit-conformance's tools/adoption.py check-order
+# rejects the adoption until each server the plugin pins has a release on the new level, naming the
+# server it waits on. For idfkit-mcp that is a hard stop: this run fails red, and the adoption
+# follows once idfkit-mcp releases.
+#
+# THE LANGUAGE SERVER IS THE ONE HONEST EXCEPTION. idfkit-lsp has never been published to PyPI
+# (idfkit/idfkit-plugin#17), so check-order will always name it, and .lsp.json has no version to
+# move to. Refusing the whole adoption for that would freeze the MCP server behind a gap this run
+# cannot close, so the MCP half proceeds and the pull request says in plain words that the LSP half
+# is unchanged and why. It does not pretend the LSP was adopted, and it does not close the
+# register's lag, which is about exactly that.
+#
+# DECLINING. Give `decline_reason` and nothing is bumped: the run records a deliberate lag in the
+# consumer register instead (FR-024). The reason states a policy, never a version.
+
+on:
+  workflow_dispatch:
+    inputs:
+      idfkit_version:
+        description: The released idfkit version to adopt, with or without a leading v.
+        required: true
+        type: string
+      decline_reason:
+        description: Decline the level instead, recording this policy as a deliberate lag.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bump-idfkit
+  cancel-in-progress: false
+
+env:
+  CONSUMER: idfkit-plugin
+  GOVERNANCE_LEVEL: governance-2026.18
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Check out the consumer register
+        uses: actions/checkout@v4
+        with:
+          repository: idfkit/idfkit-conformance
+          ref: refs/tags/${{ env.GOVERNANCE_LEVEL }}
+          path: governance
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Normalize version
+        id: ver
+        env:
+          RAW_VERSION: ${{ inputs.idfkit_version }}
+        run: |
+          set -euo pipefail
+          version="${RAW_VERSION#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "previous=$(python3 -c 'import json;print(json.load(open(".mcp.json"))["mcpServers"]["idfkit"]["args"][0])')" >> "$GITHUB_OUTPUT"
+
+      - name: Decline, and record why
+        if: inputs.decline_reason != ''
+        env:
+          GH_TOKEN: ${{ secrets.CONFORMANCE_DISPATCH_TOKEN }}
+          REASON: ${{ inputs.decline_reason }}
+        run: |
+          set -euo pipefail
+          command=(gh workflow run record-adoption.yml -R idfkit/idfkit-conformance
+                   -f consumer="$CONSUMER" -f library=python -f outcome=decline -f reason="$REASON")
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=Decline not recorded::No CONFORMANCE_DISPATCH_TOKEN, so the deliberate lag cannot be recorded from here. Run: ${command[*]}"
+            exit 1
+          fi
+          "${command[@]}"
+
+      # check-order names every provider that has not released on this level. idfkit-mcp is a
+      # hard stop; idfkit-lsp is reported and recorded, for the reason in the header.
+      - name: Refuse to adopt before idfkit-mcp has
+        id: order
+        if: inputs.decline_reason == ''
+        run: |
+          set +e
+          python governance/tools/adoption.py check-order --consumer "$CONSUMER" --library python \
+            --level "${{ steps.ver.outputs.version }}" 2> "$RUNNER_TEMP/order.txt"
+          cat "$RUNNER_TEMP/order.txt"
+          if grep -q "provider idfkit-mcp" "$RUNNER_TEMP/order.txt"; then
+            echo "::error title=Out of order::idfkit-mcp has published no release on idfkit ${{ steps.ver.outputs.version }}. The plugin adopts after it (FR-020)."
+            exit 1
+          fi
+          if grep -q "provider idfkit-lsp" "$RUNNER_TEMP/order.txt"; then
+            echo "lsp_waiting=true" >> "$GITHUB_OUTPUT"
+            echo "::warning title=LSP unchanged::idfkit-lsp has no release on this level, so .lsp.json does not move (idfkit/idfkit-plugin#17)."
+          fi
+
+      - name: Find the idfkit-mcp release on this level
+        id: release
+        if: inputs.decline_reason == ''
+        env:
+          LEVEL: ${{ steps.ver.outputs.version }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import os, sys
+          sys.path.insert(0, "governance/tools")
+          from adoption import _fetch_json, pypi_released_on
+          release = pypi_released_on(_fetch_json)("idfkit-mcp", os.environ["LEVEL"])
+          if release is None:
+              sys.exit("check-order allowed the adoption, and no idfkit-mcp release pins this level. Stop.")
+          print(f"release={release}")
+          PY
+
+      # Text substitution rather than a JSON round trip, so the file keeps its formatting and the
+      # diff is the one version string that changed.
+      - name: Pin the MCP server to that release
+        if: inputs.decline_reason == ''
+        env:
+          RELEASE: ${{ steps.release.outputs.release }}
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          path = Path(".mcp.json")
+          text, count = re.subn(r'"idfkit-mcp(@[^"]*)?"', f'"idfkit-mcp@{os.environ["RELEASE"]}"', path.read_text())
+          if count != 1:
+              raise SystemExit(f"expected one idfkit-mcp entry in .mcp.json, found {count}")
+          path.write_text(text)
+          PY
+
+      - name: Run the tests
+        id: tests
+        if: inputs.decline_reason == ''
+        continue-on-error: true
+        run: python -m unittest tests.discovery.test_discover -v
+
+      - name: Open the pull request
+        if: inputs.decline_reason == ''
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: bot/bump-idfkit-${{ steps.ver.outputs.version }}
+          title: "Deliver idfkit-mcp ${{ steps.release.outputs.release }} (idfkit ${{ steps.ver.outputs.version }})"
+          commit-message: "Deliver idfkit-mcp ${{ steps.release.outputs.release }} (idfkit ${{ steps.ver.outputs.version }})"
+          reviewers: samuelduchesne
+          body: |
+            idfkit ${{ steps.ver.outputs.version }} was released, and idfkit-mcp ${{ steps.release.outputs.release }}
+            pins it, so `.mcp.json` moves from `${{ steps.ver.outputs.previous }}` to
+            `idfkit-mcp@${{ steps.release.outputs.release }}`. Every user who installs or updates the
+            plugin after this merges runs that server.
+
+            - Discovery tests: `${{ steps.tests.outcome }}`
+            - Language server: ${{ steps.order.outputs.lsp_waiting == 'true' && 'unchanged. idfkit-lsp has no release on this level, and has never been published to PyPI, so .lsp.json has no version to move to (idfkit/idfkit-plugin#17). The register lag for that stays open.' || 'idfkit-lsp has a release on this level; move .lsp.json to it in this pull request before merging.' }}
+
+            Opened by idfkit's notify-downstream.yml; it never merges itself.

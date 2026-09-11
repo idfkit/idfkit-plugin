@@ -9,7 +9,7 @@ Claude Code, Cursor, Copilot, Gemini, Codex, and any MCP-capable client.
 
 | Layer | What it does |
 |---|---|
-| **MCP server** (`uvx idfkit-mcp`) | Tools and `idfkit://…` resources to load, query, edit, validate, and simulate IDF / epJSON models. |
+| **MCP server** (`uvx idfkit-mcp@<version>`, pinned in `.mcp.json`) | Tools and `idfkit://…` resources to load, query, edit, validate, and simulate IDF / epJSON models. |
 | **`developing-with-idfkit` skill** | Discovers the idfkit installed in your project and loads **version-matched** reference docs for writing Python against the library. |
 | **Workflow skills** | Task playbooks that orchestrate the MCP tools: `simulate`, `validate`, `new-model`, `load-model`, `energy-audit`, `weather`, `upgrade-version`, `idf-conventions`, `docs`. |
 | **Agents** | Focused sub-agents: `energy-modeler`, `envelope-analyst`, `hvac-designer`. |
@@ -91,15 +91,20 @@ From inside a Codex session, run `$skill-installer` and point it at
 
 ### MCP server — any MCP-capable client
 
-For Claude Desktop, ChatGPT, or other MCP clients, add the server directly:
+For Claude Desktop, ChatGPT, or other MCP clients, add the server directly, pinned
+to the version the plugin's own [`.mcp.json`](.mcp.json) names:
 
 ```json
 {
   "mcpServers": {
-    "idfkit": { "command": "uvx", "args": ["idfkit-mcp"] }
+    "idfkit": { "command": "uvx", "args": ["idfkit-mcp@<version>"] }
   }
 }
 ```
+
+Pin a version. Without one, `uvx` runs whatever is newest on the day, so a release
+reaches your client the moment it publishes, reviewed by nobody in between. The
+plugin itself always pins, and you type no version when you install it.
 
 ## Requirements
 
