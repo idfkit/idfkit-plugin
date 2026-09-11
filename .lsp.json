@@ -1,14 +1,7 @@
 {
   "idfkit": {
     "command": "uvx",
-    "args": [
-      "--from",
-      "idfkit-lsp==0.2.0",
-      "--prerelease=allow",
-      "python",
-      "-m",
-      "idfkit_lsp"
-    ],
+    "args": ["--from", "idfkit-lsp==0.2.0", "--prerelease=allow", "python", "-m", "idfkit_lsp"],
     "extensionToLanguage": {
       ".py": "python"
     }
