@@ -1,0 +1,37 @@
+# Rehearse the plugin against an unpublished idfkit build (feature 004, User Story 2).
+#
+# The plugin holds no code that calls idfkit. A candidate reaches a user only inside an idfkit-mcp
+# or idfkit-lsp release, so its register entry rehearses `through-provider`: the called workflow
+# builds the candidate and names the two servers whose rehearsals this is. It exists so idfkit's
+# rehearse-all.yml can address every consumer the same way.
+
+name: rehearse-candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      # Declared because both libraries' rehearse-all.yml dispatch every consumer with the same two
+      # inputs, and GitHub rejects a dispatch carrying an input the workflow does not declare. This
+      # consumer resolves one library, so the choice has one option.
+      library:
+        description: The library being rehearsed. This consumer resolves python only.
+        required: true
+        type: choice
+        options: [python]
+        default: python
+      candidate_ref:
+        description: A commit, branch or tag in idfkit/idfkit to rehearse against. Required.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rehearse:
+    uses: idfkit/idfkit-conformance/.github/workflows/rehearse.yml@governance-2026.18
+    with:
+      governance_level: governance-2026.18
+      consumer: idfkit-plugin
+      library: ${{ inputs.library }}
+      candidate_ref: ${{ inputs.candidate_ref }}
