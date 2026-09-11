@@ -25,7 +25,8 @@ idfkit package, not here.
 | Sub-agents | `agents/*.md` | Yes |
 | Slash commands | `commands/*.md` | Yes |
 | Context hooks | `hooks/hooks.json`, `scripts/*.sh` | Yes |
-| MCP server wiring | `.mcp.json` (`uvx idfkit-mcp`) | Yes |
+| MCP server wiring | `.mcp.json` (`uvx idfkit-mcp@<version>`, pinned) | Yes, by review |
+| LSP wiring | `.lsp.json` (`uvx --from idfkit-lsp`, unpinned until idfkit-lsp publishes) | Yes, by review |
 | Claude plugin / marketplace | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | Yes |
 
 ## Discovery contract
@@ -58,3 +59,28 @@ Keep the two surfaces separate:
   tools. Do not duplicate library reference content into the workflow skills, and do
   not route library references through the MCP — that coupling is intentionally
   avoided so library authoring works without spinning up the server.
+
+## Delivery paths and the consumer register
+
+This plugin hands idfkit to a person's editor, so what it pins is what they run.
+It is `idfkit-plugin` in the consumer register, `governance/consumers.toml` in
+idfkit-conformance (feature 004 of the unification), with role `delivers`,
+depending on `idfkit-mcp` and `idfkit-lsp`, and adopting in wave 2 after them.
+
+- **`.mcp.json` pins idfkit-mcp exactly** (`idfkit-mcp@X.Y.Z`). Never remove the
+  version: an unpinned `uvx idfkit-mcp` runs whatever is newest on the day, so a
+  release would reach users unreviewed. The user still types no version; the
+  level is committed here. The idfkit level follows from that release's own pin.
+- **`.lsp.json` cannot be pinned yet.** idfkit-lsp has never been published to
+  PyPI, so today that entry resolves nothing on a clean machine. The register
+  records it as a `not-yet` lag on idfkit/idfkit-plugin#17. Pin it as
+  `uvx --from idfkit-lsp==X.Y.Z` in the change that follows the first release.
+- **Both files are CODEOWNERS-reviewed**, because changing either changes what
+  every user runs.
+- **The self-check.** The `consumer-register` job in `tests.yml` calls
+  `check-consumer.yml` at a pinned governance tag and fails if the register no
+  longer describes this repository.
+- **Adoption.** `bump-idfkit.yml` refuses to adopt an idfkit level until
+  idfkit-mcp has published a release pinning it, naming it, then moves the pin
+  in `.mcp.json` and opens a pull request. `rehearse-candidate.yml` rehearses
+  through the two servers, since this repository holds no code that calls idfkit.

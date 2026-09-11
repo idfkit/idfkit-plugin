@@ -1,0 +1,9 @@
+# The two files that decide what every user of this plugin runs. .mcp.json pins the idfkit-mcp
+# release an editor acquires, and .lsp.json the language server. Changing either changes what
+# reaches a person's editor, so feature 004 of the unification (FR-016) requires the change to be
+# reviewed, not only detected by the consumer register's self-check.
+#
+# Enforcement needs branch protection with "Require review from Code Owners" on main.
+
+/.mcp.json   @samuelduchesne
+/.lsp.json   @samuelduchesne
