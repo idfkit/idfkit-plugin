@@ -10,8 +10,12 @@ run-name: Adopt EnergyPlus ${{ inputs.release }}
 # merges or publishes. This file carries no other logic.
 #
 # WHAT IT DOES NOT MOVE. The delivery pins in .mcp.json and .lsp.json. bump-idfkit.yml moves the
-# idfkit-mcp pin when idfkit releases. Until both pinned servers resolve an idfkit that carries the
-# release, a run reports that it is waiting and changes nothing.
+# idfkit-mcp pin when idfkit releases. No workflow moves the idfkit-lsp pin: a maintainer edits
+# .lsp.json by hand. Until both pinned servers resolve an idfkit that carries the release, a run
+# reports that it is waiting and changes nothing.
+#
+# ONE RUN PER RELEASE AT A TIME. Two runs for the same release would each regenerate and push the
+# branch energyplus/X.Y.Z, so the second waits for the first.
 #
 # The tag is written twice, on `uses:` and as the input, because a called workflow cannot see its
 # own ref. The called workflow refuses the run unless they are identical. Move both together, and
@@ -28,6 +32,10 @@ on:
 permissions:
   contents: write
   pull-requests: write
+
+concurrency:
+  group: adopt-energyplus-${{ inputs.release }}
+  cancel-in-progress: false
 
 jobs:
   adopt:
