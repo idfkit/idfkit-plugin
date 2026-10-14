@@ -1,0 +1,41 @@
+name: adopt-energyplus
+
+run-name: Adopt EnergyPlus ${{ inputs.release }}
+
+# Adopt one EnergyPlus release, as a pull request (feature 012 of the unification).
+#
+# This repository is `idfkit-plugin` in the version roster, governance/energyplus.toml in
+# idfkit-conformance. The called workflow reads the roster at the pinned tag, rewrites the declared
+# statements in the skill text, and opens a pull request on the branch energyplus/X.Y.Z. It never
+# merges or publishes. This file carries no other logic.
+#
+# WHAT IT DOES NOT MOVE. The delivery pins in .mcp.json and .lsp.json. bump-idfkit.yml moves the
+# idfkit-mcp pin when idfkit releases. Until both pinned servers resolve an idfkit that carries the
+# release, a run reports that it is waiting and changes nothing.
+#
+# The tag is written twice, on `uses:` and as the input, because a called workflow cannot see its
+# own ref. The called workflow refuses the run unless they are identical. Move both together, and
+# only to a tag that exists.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: The EnergyPlus release to adopt, as X.Y.Z.
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  adopt:
+    uses: idfkit/idfkit-conformance/.github/workflows/adopt-energyplus.yml@governance-2026.24
+    with:
+      project: idfkit-plugin
+      governance_level: governance-2026.24
+      release: ${{ inputs.release }}
+    secrets:
+      APP_ID: ${{ secrets.APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
