@@ -169,6 +169,10 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           branch: bot/bump-idfkit-${{ steps.ver.outputs.version }}
+          # Only what this workflow writes. Every other checkout (the register under governance/) lives in
+          # the same tree, and without this list it is committed as a gitlink.
+          add-paths: |
+            .mcp.json
           title: "Deliver idfkit-mcp ${{ steps.release.outputs.release }} (idfkit ${{ steps.ver.outputs.version }})"
           commit-message: "Deliver idfkit-mcp ${{ steps.release.outputs.release }} (idfkit ${{ steps.ver.outputs.version }})"
           reviewers: samuelduchesne
