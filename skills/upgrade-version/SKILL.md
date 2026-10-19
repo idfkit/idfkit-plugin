@@ -21,7 +21,7 @@ Upgrade: $ARGUMENTS
    note the current version.
 
 2. **Resolve target** — If `target_version` is not given, default to the latest supported version
-   (currently 26.1.0) and confirm with the user. `migrate_model` defaults to the installed
+   (currently 26.2.0) and confirm with the user. `migrate_model` defaults to the installed
    EnergyPlus version when `target_version` is omitted.
 
 3. **Preflight the direction** — Migration is forward-only:
@@ -53,6 +53,6 @@ Upgrade: $ARGUMENTS
    - the saved path,
    - any transition-emitted warnings that need manual review.
 
-**Supported range**: 8.9.0 through the latest supported version (currently 26.1.0). EnergyPlus
+**Supported range**: 8.9.0 through the latest supported version (currently 26.2.0). EnergyPlus
 switched from SemVer to CalVer at 9.6.0 → 22.1.0, so there is no 10.x; the achievable range is
 ultimately bounded by the transition binaries shipped with the installed EnergyPlus.
