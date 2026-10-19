@@ -4,19 +4,20 @@ name: bump-idfkit
 #
 # idfkit's notify-downstream.yml dispatches this in wave 2, after the consumers that resolve idfkit
 # directly, because the plugin reaches idfkit only through the two servers it hands to an editor.
-# It never pins idfkit. It pins idfkit-mcp in .mcp.json, and idfkit follows from that release.
+# It never pins idfkit. It pins idfkit-mcp in .mcp.json and idfkit-lsp in .lsp.json, and idfkit
+# follows from those releases.
 #
 # ORDER IS ENFORCED HERE, NOT ASSUMED (FR-020). idfkit-conformance's tools/adoption.py check-order
 # rejects the adoption until each server the plugin pins has a release on the new level, naming the
 # server it waits on. For idfkit-mcp that is a hard stop: this run fails red, and the adoption
 # follows once idfkit-mcp releases.
 #
-# THE LANGUAGE SERVER IS THE ONE HONEST EXCEPTION. idfkit-lsp has never been published to PyPI
-# (idfkit/idfkit-plugin#17), so check-order will always name it, and .lsp.json has no version to
-# move to. Refusing the whole adoption for that would freeze the MCP server behind a gap this run
-# cannot close, so the MCP half proceeds and the pull request says in plain words that the LSP half
-# is unchanged and why. It does not pretend the LSP was adopted, and it does not close the
-# register's lag, which is about exactly that.
+# THE LANGUAGE SERVER DOES NOT STOP THE RUN. idfkit-lsp is published to PyPI since 0.2.0
+# (idfkit/idfkit-plugin#17), and .lsp.json moves to its newest release on the level in the same pull
+# request as .mcp.json. When idfkit-lsp has no release on the level yet, the MCP half proceeds alone
+# and the pull request says that .lsp.json is unchanged. The plugin's EnergyPlus delivery-pins step
+# checks both pins, so a pull request that moves only one leaves that step waiting until the other
+# is moved by hand.
 #
 # DECLINING. Give `decline_reason` and nothing is bumped: the run records a deliberate lag in the
 # consumer register instead (FR-024). The reason states a policy, never a version.
@@ -122,23 +123,30 @@ jobs:
           fi
           if grep -q "provider idfkit-lsp" "$RUNNER_TEMP/order.txt"; then
             echo "lsp_waiting=true" >> "$GITHUB_OUTPUT"
-            echo "::warning title=LSP unchanged::idfkit-lsp has no release on this level, so .lsp.json does not move (idfkit/idfkit-plugin#17)."
+            echo "::warning title=LSP unchanged::idfkit-lsp has no release on this level, so .lsp.json does not move."
           fi
 
-      - name: Find the idfkit-mcp release on this level
+      - name: Find the server releases on this level
         id: release
         if: inputs.decline_reason == ''
         env:
           LEVEL: ${{ steps.ver.outputs.version }}
+          LSP_WAITING: ${{ steps.order.outputs.lsp_waiting }}
         run: |
           python - <<'PY' >> "$GITHUB_OUTPUT"
           import os, sys
           sys.path.insert(0, "governance/tools")
           from adoption import _fetch_json, pypi_released_on
-          release = pypi_released_on(_fetch_json)("idfkit-mcp", os.environ["LEVEL"])
+          released_on = pypi_released_on(_fetch_json)
+          release = released_on("idfkit-mcp", os.environ["LEVEL"])
           if release is None:
               sys.exit("check-order allowed the adoption, and no idfkit-mcp release pins this level. Stop.")
           print(f"release={release}")
+          if os.environ.get("LSP_WAITING") != "true":
+              lsp = released_on("idfkit-lsp", os.environ["LEVEL"])
+              if lsp is None:
+                  sys.exit("check-order allowed the adoption, and no idfkit-lsp release pins this level. Stop.")
+              print(f"lsp_release={lsp}")
           PY
 
       # Text substitution rather than a JSON round trip, so the file keeps its formatting and the
@@ -158,6 +166,22 @@ jobs:
           path.write_text(text)
           PY
 
+      # The same substitution for the language server, whose pin is the `--from` argument.
+      - name: Pin the language server to that release
+        if: inputs.decline_reason == '' && steps.release.outputs.lsp_release != ''
+        env:
+          RELEASE: ${{ steps.release.outputs.lsp_release }}
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          path = Path(".lsp.json")
+          text, count = re.subn(r'"idfkit-lsp(==[^"]*)?"', f'"idfkit-lsp=={os.environ["RELEASE"]}"', path.read_text())
+          if count != 1:
+              raise SystemExit(f"expected one idfkit-lsp entry in .lsp.json, found {count}")
+          path.write_text(text)
+          PY
+
       - name: Run the tests
         id: tests
         if: inputs.decline_reason == ''
@@ -173,6 +197,7 @@ jobs:
           # the same tree, and without this list it is committed as a gitlink.
           add-paths: |
             .mcp.json
+            .lsp.json
           title: "Deliver idfkit-mcp ${{ steps.release.outputs.release }} (idfkit ${{ steps.ver.outputs.version }})"
           commit-message: "Deliver idfkit-mcp ${{ steps.release.outputs.release }} (idfkit ${{ steps.ver.outputs.version }})"
           reviewers: samuelduchesne
@@ -183,6 +208,6 @@ jobs:
             plugin after this merges runs that server.
 
             - Discovery tests: `${{ steps.tests.outcome }}`
-            - Language server: ${{ steps.order.outputs.lsp_waiting == 'true' && 'unchanged. idfkit-lsp has no release on this level, and has never been published to PyPI, so .lsp.json has no version to move to (idfkit/idfkit-plugin#17). The register lag for that stays open.' || 'idfkit-lsp has a release on this level; move .lsp.json to it in this pull request before merging.' }}
+            - Language server: ${{ steps.release.outputs.lsp_release != '' && format('`.lsp.json` moves to `idfkit-lsp=={0}`, the newest idfkit-lsp release on this level.', steps.release.outputs.lsp_release) || 'unchanged. idfkit-lsp has no release on this level yet. Move `.lsp.json` by hand once it has one; the EnergyPlus delivery-pins step waits on both pins.' }}
 
             Opened by idfkit's notify-downstream.yml; it never merges itself.
