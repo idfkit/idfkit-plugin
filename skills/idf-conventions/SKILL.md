@@ -51,7 +51,7 @@ The server may expose more — treat its live instructions as authoritative rath
 8. **Read resources for object data** — use `idfkit://model/objects/{type}/{name}` to inspect objects and `idfkit://model/references/{name}` to check references
 
 ### Version Support
-- Supported EnergyPlus versions: 8.9.0 through the latest supported (currently 26.1.0); idfkit exposes the newest as `LATEST_VERSION`
+- Supported EnergyPlus versions: 8.9.0 through the latest supported (currently 26.2.0); idfkit exposes the newest as `LATEST_VERSION`
 - Default version for new models: the latest supported version
 - Schemas are bundled — no EnergyPlus installation needed for editing or schema validation; only simulation and version migration require an EnergyPlus install
 
