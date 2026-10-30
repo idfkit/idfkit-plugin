@@ -1,21 +1,35 @@
 #!/usr/bin/env python3
-"""Discover the idfkit package's bundled agent-skills SKILL.md.
+"""Discover the bundled agent-skills SKILL.md of the idfkit a project uses.
 
 Usage:
-    python scripts/discover.py [--project-dir PATH]
+    python scripts/discover.py [--project-dir PATH] [--language {auto,python,js}]
 
-When --project-dir is given, the script resolves `.venv`, `../.venv`,
+idfkit has two implementations: the Python package `idfkit` (PyPI) and the
+JavaScript/TypeScript line `@idfkit/*` (npm). `--language` picks which one to
+resolve; `auto` (the default) picks `js` when the project directory has a
+`package.json` naming an `@idfkit/` package or an installed `@idfkit/` package
+in reach, and no Python project manifest, and `python` otherwise.
+
+Python: when --project-dir is given, the script resolves `.venv`, `../.venv`,
 `<git-root>/.venv`, `Pipfile`, and the `poetry.lock`/`pdm.lock`/`uv.lock`
 lockfiles (each paired with a `pyproject.toml`) relative to that path (so its
 checks land on the user's project rather than on the script's installed
 location). An active conda `base` environment is ignored, since `CONDA_PREFIX`
 is exported merely by initializing conda.
 
+JavaScript: the script walks `node_modules/` up from --project-dir, the way
+Node resolves a bare specifier, for `@idfkit/idfkit` (the shared install name)
+and then `@idfkit/core`. No Node interpreter is needed. Yarn Plug'n'Play
+installs, which have no `node_modules/`, are not resolved.
+
 Exit codes:
     0 - success; prints the absolute path to the bundled SKILL.md on stdout.
-    1 - idfkit is not installed in the detected interpreter.
-    2 - idfkit is installed but predates bundled skills (< 0.13, no .agents/skills/).
-    3 - no usable Python interpreter was found.
+    1 - idfkit is not installed (Python: in the detected interpreter;
+        JS: no `@idfkit/idfkit` or `@idfkit/core` under any `node_modules/`).
+    2 - idfkit is installed but ships no bundled skill (Python: < 0.13, no
+        .agents/skills/; JS: the installed release ships none). The error
+        names version-matched fallbacks.
+    3 - no usable Python interpreter was found (Python only).
     4 - .agents/skills/ exists but the expected developing-with-idfkit/SKILL.md
         is missing from the documented sub-path (likely upstream restructured).
         The agent should read the listed available skills directly.
@@ -27,6 +41,7 @@ On non-zero exit, a human-readable "ERROR:" block is printed on stderr.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -34,6 +49,23 @@ import sys
 from pathlib import Path
 
 DOCS_FALLBACK = "https://docs.idfkit.com"
+JS_DOCS_FALLBACK = "https://js.idfkit.com"
+
+# The npm packages that may carry the bundled skill, in lookup order.
+# `@idfkit/idfkit` is the shared install name; `@idfkit/core` is the library
+# itself and what every JS install has, directly or through the facade.
+JS_PACKAGES = ("@idfkit/idfkit", "@idfkit/core")
+
+SKILL_SUBPATH = Path(".agents") / "skills" / "developing-with-idfkit" / "SKILL.md"
+
+# Files whose presence marks a Python project, for `--language auto`.
+PYTHON_MARKERS = (
+    "pyproject.toml",
+    "setup.py",
+    "setup.cfg",
+    "requirements.txt",
+    "Pipfile",
+)
 
 
 def find_venv_python(venv_root: Path) -> Path | None:
@@ -180,14 +212,189 @@ def install_advice(cmd: list[str], tag: str) -> str:
     )
 
 
+def find_node_package(name: str, start: Path) -> Path | None:
+    """Resolve an installed npm package directory the way Node does.
+
+    Walks ``start`` and its ancestors for ``node_modules/<name>/package.json``
+    and returns the package directory with symlinks resolved (pnpm links every
+    package into its store, where its own dependencies sit beside it).
+    """
+    for ancestor in [start, *start.parents]:
+        manifest = ancestor / "node_modules" / name / "package.json"
+        if manifest.is_file():
+            return manifest.parent.resolve()
+    return None
+
+
+def find_js_packages(project_dir: Path) -> dict[str, Path]:
+    """Return the installed ``JS_PACKAGES`` reachable from ``project_dir``.
+
+    ``@idfkit/core`` is also looked up from the facade's resolved location,
+    since under pnpm it is not hoisted next to the project.
+    """
+    found: dict[str, Path] = {}
+    for name in JS_PACKAGES:
+        pkg = find_node_package(name, project_dir)
+        if pkg is None and found:
+            pkg = find_node_package(name, next(iter(found.values())))
+        if pkg is not None:
+            found[name] = pkg
+    return found
+
+
+def package_json_names_idfkit(project_dir: Path) -> bool:
+    """True when ``project_dir/package.json`` declares any ``@idfkit/`` package."""
+    manifest = project_dir / "package.json"
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    for field in (
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+    ):
+        deps = data.get(field)
+        if isinstance(deps, dict) and any(
+            str(k).startswith("@idfkit/") for k in deps
+        ):
+            return True
+    return False
+
+
+def detect_language(project_dir: Path) -> str:
+    """Pick ``python`` or ``js`` for ``--language auto``.
+
+    JS only when the project shows idfkit-js and nothing Python: a project with
+    both should be resolved with an explicit ``--language``.
+    """
+    if any((project_dir / m).is_file() for m in PYTHON_MARKERS):
+        return "python"
+    if package_json_names_idfkit(project_dir) or find_js_packages(project_dir):
+        return "js"
+    return "python"
+
+
+def js_install_advice(project_dir: Path) -> str:
+    """Return the install command for the project's JS package manager,
+    chosen by lockfile in ``project_dir`` or, failing that, its git root."""
+    roots = [project_dir]
+    git_root = find_git_root(project_dir)
+    if git_root is not None and git_root != project_dir:
+        roots.append(git_root)
+    for root in roots:
+        if (root / "pnpm-lock.yaml").is_file():
+            return "pnpm add @idfkit/idfkit"
+        if (root / "yarn.lock").is_file():
+            return "yarn add @idfkit/idfkit"
+        if (root / "bun.lock").is_file() or (root / "bun.lockb").is_file():
+            return "bun add @idfkit/idfkit"
+        if (root / "package-lock.json").is_file():
+            return "npm install @idfkit/idfkit"
+    return "npm install @idfkit/idfkit"
+
+
+def package_version(pkg: Path) -> str:
+    try:
+        data = json.loads((pkg / "package.json").read_text(encoding="utf-8"))
+        return str(data.get("version", "unknown"))
+    except (OSError, ValueError, AttributeError):
+        return "unknown"
+
+
+def discover_js(project_dir: Path) -> int:
+    packages = find_js_packages(project_dir)
+    if not packages:
+        print(
+            "ERROR: idfkit-js is not installed in this project.\n"
+            f"Searched:      node_modules/ from {project_dir} upward for\n"
+            f"               {', '.join(JS_PACKAGES)}\n"
+            "\n"
+            f"Install with:  {js_install_advice(project_dir)}\n"
+            "\n"
+            "Then re-run this script. If the project is a Yarn Plug'n'Play install\n"
+            "(no node_modules/), read the docs instead:\n"
+            f"  {JS_DOCS_FALLBACK}",
+            file=sys.stderr,
+        )
+        return 1
+
+    for pkg in packages.values():
+        skill = pkg / SKILL_SUBPATH
+        if skill.is_file():
+            print(skill)
+            return 0
+
+    for name, pkg in packages.items():
+        agents_skills_dir = pkg / SKILL_SUBPATH.parent.parent
+        if agents_skills_dir.is_dir():
+            print(
+                f"ERROR: {name}'s bundled skills directory exists, but the expected\n"
+                "developing-with-idfkit/SKILL.md is missing from the documented sub-path.\n"
+                "This usually means upstream idfkit-js reorganized the skill layout.\n"
+                "\n"
+                f"Package path: {pkg}\n"
+                f"Bundled skills directory: {agents_skills_dir}\n"
+                "Available entries:",
+                file=sys.stderr,
+            )
+            for entry in sorted(agents_skills_dir.iterdir()):
+                print(f"  {entry.name}", file=sys.stderr)
+            print(
+                "\n"
+                "Read whichever skill best matches the user's task. If none match,\n"
+                "fall back to the idfkit-js documentation:\n"
+                f"  {JS_DOCS_FALLBACK}",
+                file=sys.stderr,
+            )
+            return 4
+
+    # No bundled skill. The installed package still carries version-matched
+    # material: its README and its type declarations, which hold the TSDoc.
+    lines = []
+    for name, pkg in packages.items():
+        lines.append(f"  {name} {package_version(pkg)}  ({pkg})")
+    references = []
+    for pkg in packages.values():
+        for rel in ("README.md", "dist/index.d.ts", "dist/node.d.ts", "index.d.ts"):
+            candidate = pkg / rel
+            if candidate.is_file():
+                references.append(f"  {candidate}")
+    print(
+        "ERROR: idfkit-js is installed but ships no bundled skill.\n"
+        "Installed:\n" + "\n".join(lines) + "\n"
+        "\n"
+        "Read these version-matched files from the installed package instead\n"
+        "(the .d.ts entry points re-export from sibling .d.ts files, which carry\n"
+        "the TSDoc for every export):\n"
+        + ("\n".join(references) if references else "  (none found)") + "\n"
+        "\n"
+        "and the idfkit-js documentation for task-oriented guides:\n"
+        f"  {JS_DOCS_FALLBACK}",
+        file=sys.stderr,
+    )
+    return 2
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Discover the bundled developing-with-idfkit SKILL.md.",
+        description="Discover the bundled developing-with-idfkit SKILL.md "
+        "(Python idfkit or idfkit-js).",
     )
     parser.add_argument(
         "--project-dir",
         default=None,
         help="Absolute path to the user's project directory. Defaults to cwd.",
+    )
+    parser.add_argument(
+        "--language",
+        choices=("auto", "python", "js"),
+        default="auto",
+        help="Which idfkit to resolve: the Python package or the JS/TS @idfkit/* "
+        "packages. Defaults to auto-detection from the project directory.",
     )
     try:
         args = parser.parse_args()
@@ -205,6 +412,12 @@ def main() -> int:
     else:
         project_dir = Path.cwd()
     project_dir = project_dir.resolve()
+
+    language = args.language
+    if language == "auto":
+        language = detect_language(project_dir)
+    if language == "js":
+        return discover_js(project_dir)
 
     detection = detect_interpreter(project_dir)
     if detection is None:

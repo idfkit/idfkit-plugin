@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import subprocess
 import sys
@@ -290,7 +291,7 @@ class MainExitCodeTests(unittest.TestCase):
             args=[], returncode=returncode, stdout=stdout, stderr=stderr,
         )
         out, err = io.StringIO(), io.StringIO()
-        with mock.patch.object(sys, "argv", ["discover.py"]), \
+        with mock.patch.object(sys, "argv", ["discover.py", "--language", "python"]), \
              mock.patch.object(discover, "detect_interpreter",
                                return_value=(["python3"], "system")), \
              mock.patch.object(discover.subprocess, "run", return_value=fake_proc), \
@@ -335,6 +336,183 @@ class MainExitCodeTests(unittest.TestCase):
         )
         self.assertEqual(code, 1)
         self.assertIn("not installed", err)
+
+
+
+def _js_package(root: Path, name: str, version: str = "1.2.3") -> Path:
+    pkg = root / "node_modules" / name
+    pkg.mkdir(parents=True, exist_ok=True)
+    (pkg / "package.json").write_text(
+        json.dumps({"name": name, "version": version}), encoding="utf-8"
+    )
+    return pkg
+
+
+class DetectLanguageTests(unittest.TestCase):
+    def test_package_json_with_idfkit_dep_is_js(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "package.json").write_text(
+                json.dumps({"dependencies": {"@idfkit/idfkit": "^0.5.0"}}),
+                encoding="utf-8",
+            )
+            self.assertEqual(discover.detect_language(project), "js")
+
+    def test_installed_package_is_js(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            _js_package(project, "@idfkit/core")
+            self.assertEqual(discover.detect_language(project), "js")
+
+    def test_python_manifest_wins(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            _touch(project / "pyproject.toml")
+            _js_package(project, "@idfkit/core")
+            self.assertEqual(discover.detect_language(project), "python")
+
+    def test_unrelated_package_json_is_python(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "package.json").write_text(
+                json.dumps({"dependencies": {"react": "^18"}}), encoding="utf-8"
+            )
+            self.assertEqual(discover.detect_language(project), "python")
+
+    def test_malformed_package_json_is_python(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "package.json").write_text("{not json", encoding="utf-8")
+            self.assertEqual(discover.detect_language(project), "python")
+
+
+class FindJsPackagesTests(unittest.TestCase):
+    def test_resolves_from_ancestor_node_modules(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pkg = _js_package(root, "@idfkit/core")
+            project = root / "apps" / "web"
+            project.mkdir(parents=True)
+            found = discover.find_js_packages(project)
+            self.assertEqual(found, {"@idfkit/core": pkg.resolve()})
+
+    def test_core_resolved_beside_facade(self):
+        # pnpm layout: only the facade is linked into the project; core sits
+        # beside it in the store.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = root / "store"
+            facade = _js_package(store, "@idfkit/idfkit")
+            core = _js_package(store, "@idfkit/core")
+            project = root / "project"
+            (project / "node_modules" / "@idfkit").mkdir(parents=True)
+            link = project / "node_modules" / "@idfkit" / "idfkit"
+            try:
+                link.symlink_to(facade, target_is_directory=True)
+            except OSError:
+                self.skipTest("symlinks unavailable")
+            found = discover.find_js_packages(project)
+            self.assertEqual(found["@idfkit/idfkit"], facade.resolve())
+            self.assertEqual(found["@idfkit/core"], core.resolve())
+
+
+class JsInstallAdviceTests(unittest.TestCase):
+    def test_lockfiles(self):
+        cases = {
+            "pnpm-lock.yaml": "pnpm add @idfkit/idfkit",
+            "yarn.lock": "yarn add @idfkit/idfkit",
+            "bun.lock": "bun add @idfkit/idfkit",
+            "package-lock.json": "npm install @idfkit/idfkit",
+        }
+        for lockfile, expected in cases.items():
+            with tempfile.TemporaryDirectory() as tmp:
+                project = Path(tmp)
+                _touch(project / lockfile)
+                with mock.patch.object(discover, "find_git_root", return_value=None):
+                    self.assertEqual(discover.js_install_advice(project), expected)
+
+    def test_default_is_npm(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(discover, "find_git_root", return_value=None):
+                self.assertEqual(
+                    discover.js_install_advice(Path(tmp)),
+                    "npm install @idfkit/idfkit",
+                )
+
+
+class JsExitCodeTests(unittest.TestCase):
+    def _run(self, project: Path, *extra: str):
+        return subprocess.run(
+            [sys.executable, str(DISCOVER), "--project-dir", str(project), *extra],
+            capture_output=True,
+            text=True,
+        )
+
+    def test_exit_0_prints_bundled_skill(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            pkg = _js_package(project, "@idfkit/core")
+            skill = _touch(pkg / discover.SKILL_SUBPATH)
+            result = self._run(project, "--language", "js")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(skill.resolve()))
+
+    def test_facade_skill_preferred(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            facade = _js_package(project, "@idfkit/idfkit")
+            core = _js_package(project, "@idfkit/core")
+            facade_skill = _touch(facade / discover.SKILL_SUBPATH)
+            _touch(core / discover.SKILL_SUBPATH)
+            result = self._run(project, "--language", "js")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(facade_skill.resolve()))
+
+    def test_auto_detects_js(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            pkg = _js_package(project, "@idfkit/core")
+            skill = _touch(pkg / discover.SKILL_SUBPATH)
+            result = self._run(project)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(skill.resolve()))
+
+    def test_exit_1_when_not_installed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            _touch(project / "pnpm-lock.yaml")
+            result = self._run(project, "--language", "js")
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("not installed", result.stderr)
+            self.assertIn("pnpm add @idfkit/idfkit", result.stderr)
+
+    def test_exit_2_points_at_version_matched_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            pkg = _js_package(project, "@idfkit/core", version="0.7.0")
+            readme = _touch(pkg / "README.md")
+            dts = _touch(pkg / "dist" / "index.d.ts")
+            result = self._run(project, "--language", "js")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("ships no bundled skill", result.stderr)
+            self.assertIn("@idfkit/core 0.7.0", result.stderr)
+            self.assertIn(str(readme.resolve()), result.stderr)
+            self.assertIn(str(dts.resolve()), result.stderr)
+            self.assertIn(discover.JS_DOCS_FALLBACK, result.stderr)
+
+    def test_exit_4_when_layout_changed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            pkg = _js_package(project, "@idfkit/core")
+            _touch(pkg / ".agents" / "skills" / "some-other-skill" / "SKILL.md")
+            result = self._run(project, "--language", "js")
+            self.assertEqual(result.returncode, 4)
+            self.assertIn("some-other-skill", result.stderr)
+
+    def test_bad_language_exits_5(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = self._run(Path(tmp), "--language", "rust")
+            self.assertEqual(result.returncode, 5)
 
 
 if __name__ == "__main__":
