@@ -1,4 +1,18 @@
-# idfkit plugin
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.4/marks/mark-on-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.4/marks/mark-on-light.svg">
+    <img alt="idfkit" width="72" src="https://raw.githubusercontent.com/idfkit/idfkit-brand/identity-2026.4/marks/tile.png">
+  </picture>
+</p>
+
+# idfkit-plugin
+
+A Claude Code and Codex plugin that bundles the idfkit MCP and language servers with skills for EnergyPlus modelling.
+
+[idfkit](https://idfkit.com) · [Developers](https://developers.idfkit.com) · [EnergyPlus docs](https://docs.idfkit.com) · [Envelop](https://app.idfkit.com) · [MCP](https://mcp.idfkit.com) · [Shoebox](https://shoebox.idfkit.com) · [GitHub](https://github.com/idfkit)
+
+[![Release](https://img.shields.io/github/v/release/idfkit/idfkit-plugin)](https://github.com/idfkit/idfkit-plugin/releases) [![Build status](https://img.shields.io/github/actions/workflow/status/idfkit/idfkit-plugin/tests.yml?branch=main)](https://github.com/idfkit/idfkit-plugin/actions/workflows/tests.yml?query=branch%3Amain) [![License](https://img.shields.io/github/license/idfkit/idfkit-plugin)](https://github.com/idfkit/idfkit-plugin/blob/main/LICENSE)
 
 The agentic plugin for [idfkit](https://idfkit.com) — EnergyPlus building energy
 modeling for AI coding assistants. It bundles everything an agent needs to create,
