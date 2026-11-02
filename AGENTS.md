@@ -26,7 +26,7 @@ idfkit package, not here.
 | Slash commands | `commands/*.md` | Yes |
 | Context hooks | `hooks/hooks.json`, `scripts/*.sh` | Yes |
 | MCP server wiring | `.mcp.json` (`uvx idfkit-mcp@<version>`, pinned) | Yes, by review |
-| LSP wiring | `.lsp.json` (`uvx --from idfkit-lsp==<version> --prerelease=allow`, pinned) | Yes, by review |
+| LSP wiring | `.lsp.json` (`uvx --from idfkit-lsp==<version>`, pinned) | Yes, by review |
 | Claude plugin / marketplace | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` | Yes |
 
 ## Discovery contract
@@ -72,11 +72,10 @@ depending on `idfkit-mcp` and `idfkit-lsp`, and adopting in wave 2 after them.
   release would reach users unreviewed. The user still types no version; the
   level is committed here. The idfkit level follows from that release's own pin.
 - **`.lsp.json` pins idfkit-lsp exactly** (`--from idfkit-lsp==X.Y.Z`), on the
-  same terms as `.mcp.json`. `--prerelease=allow` follows the pin while
-  idfkit-lsp depends on a pre-release of idfkit, because uv installs a
-  pre-release of an indirect dependency only when told to. Keep the flag after
-  the pin, so the level stays at `args[1]` where the consumer register reads it,
-  and drop it once idfkit-lsp depends on a stable idfkit.
+  same terms as `.mcp.json`. Keep the level at `args[1]`, where the consumer
+  register reads it. If idfkit-lsp again depends on a pre-release of idfkit, add
+  `--prerelease=allow` after the pin, because uv installs a pre-release of an
+  indirect dependency only when told to.
 - **Both files are CODEOWNERS-reviewed**, because changing either changes what
   every user runs.
 - **The self-check.** The `consumer-register` job in `tests.yml` calls
