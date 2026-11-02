@@ -7,14 +7,14 @@
   },
   "metadata": {
     "description": "EnergyPlus building energy modeling for AI coding agents — the idfkit plugin marketplace.",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "idfkit",
       "source": "./",
       "description": "EnergyPlus building energy modeling plugin — MCP server, LSP, skills, and agents for creating, validating, and simulating building energy models with idfkit.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "idfkit",
         "email": "developers@idfkit.com",
