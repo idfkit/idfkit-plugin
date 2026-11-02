@@ -16,7 +16,6 @@ First tagged release. Version 0.1.0 was never tagged, and its number covered eve
 - The `developing-with-idfkit` skill, which discovers the reference documentation bundled with the installed idfkit package.
 - The `energy-modeler`, `envelope-analyst` and `hvac-designer` agents, the `/quick-sim` command and context hooks for model and weather files.
 - Plugin manifests for Claude Code and Codex.
-- The idfkit visual identity in the README, with a CI check at `identity-2026.4`.
 - Workflows that adopt idfkit and EnergyPlus releases as pull requests, and a consumer register check in CI.
 
 ### Changed
