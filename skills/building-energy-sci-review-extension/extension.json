@@ -1,0 +1,18 @@
+{
+  "contract_version": 1,
+  "id": "building-energy-sci-review-extension",
+  "plugin": "idfkit",
+  "perspective": {
+    "id": "building-physicist",
+    "name": "Building physicist",
+    "brief": "perspective.md"
+  },
+  "reference": ["reference/building-energy.md"],
+  "applies_to": {
+    "globs": ["**/*.idf", "**/*.epJSON", "**/*.epw", "**/eplusout*"],
+    "file_types": [".idf", ".epjson", ".epw"],
+    "languages": ["python", "typescript"],
+    "import_patterns": ["^\\s*(from|import)\\s+idfkit\\b", "from\\s+['\"]@?idfkit"]
+  },
+  "checks": "checks.md"
+}
