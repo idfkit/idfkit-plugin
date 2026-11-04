@@ -1,0 +1,143 @@
+{
+  "fixture": "building-energy",
+  "description": "Seeded building-energy defects and correct look-alikes for the sci-review building-energy extension. The main branch holds the baseline; the feature branch adds every entry below.",
+  "baseline_branch": "main",
+  "review_branch": "feature",
+  "entries": [
+    {
+      "id": "py-hour-ending-read-as-starting",
+      "file": "src/bem/profiles.py",
+      "line": 19,
+      "anchor": "profile[t.hour] += v / 3.6e6",
+      "description": "EnergyPlus hourly time stamps returned by idfkit mark the end of each interval; binning by t.hour places every interval one hour late (08:00 to 09:00 lands in bin 9) and the last interval of the year in bin 0. Fix: bin by (t - timedelta(hours=1)).hour.",
+      "language": "python",
+      "kind": "defect"
+    },
+    {
+      "id": "py-lookalike-hour-shift",
+      "file": "src/bem/profiles.py",
+      "line": 30,
+      "anchor": "profile[(t - step).hour] += v / 3.6e6",
+      "description": "Correct: the interval-end time stamp is shifted back by one reporting interval before binning.",
+      "language": "python",
+      "kind": "lookalike"
+    },
+    {
+      "id": "py-kbtu-to-kwh-wrong-factor",
+      "file": "src/bem/units.py",
+      "line": 6,
+      "anchor": "KWH_PER_KBTU = 3.412",
+      "description": "3.412 is kBtu per kWh, not kWh per kBtu; a 1000 kBtu bill becomes 3412 kWh instead of 293.07 kWh (1 kBtu = 0.29307107 kWh), a factor of 11.64. Fix: KWH_PER_KBTU = 0.29307107.",
+      "language": "python",
+      "kind": "defect"
+    },
+    {
+      "id": "py-lookalike-kwh-to-kbtu",
+      "file": "src/bem/units.py",
+      "line": 21,
+      "anchor": "return kwh * 3.412141633",
+      "description": "Correct: 1 kWh = 3.412141633 kBtu, applied in the kWh to kBtu direction.",
+      "language": "python",
+      "kind": "lookalike"
+    },
+    {
+      "id": "py-leap-year-truncated",
+      "file": "src/bem/climate.py",
+      "line": 14,
+      "anchor": "dry_bulb_temperature[:8760]",
+      "description": "Truncating to 8760 values drops December 31 from a leap-year (8784-hour) EPW, so heating degree-hours omit one winter day. Fix: iterate over every record.",
+      "language": "python",
+      "kind": "defect"
+    },
+    {
+      "id": "py-lookalike-typical-year-guard",
+      "file": "src/bem/climate.py",
+      "line": 21,
+      "anchor": "if len(temps) != 8760:",
+      "description": "Correct: the function documents that it accepts typical years only and rejects any other length explicitly.",
+      "language": "python",
+      "kind": "lookalike"
+    },
+    {
+      "id": "py-lookalike-celsius-difference",
+      "file": "src/bem/climate.py",
+      "line": 28,
+      "anchor": "u_value * area_m2 * (t_in_c - t_out_c)",
+      "description": "Correct: a temperature difference in degrees Celsius equals one in kelvin in a linear conduction relation.",
+      "language": "python",
+      "kind": "lookalike"
+    },
+    {
+      "id": "ts-hour-ending-read-as-starting",
+      "file": "src/bem/profiles.ts",
+      "line": 14,
+      "anchor": "sum[hours.hour[i] % 24]",
+      "description": "EPW hour h covers h-1 to h; indexing by hour % 24 places every hour one bin late and hour 24 (23:00 to 24:00) in bin 0. Fix: index by hours.hour[i] - 1.",
+      "language": "typescript",
+      "kind": "defect"
+    },
+    {
+      "id": "ts-lookalike-hour-shift",
+      "file": "src/bem/profiles.ts",
+      "line": 24,
+      "anchor": "sum[hours.hour[i] - 1]",
+      "description": "Correct: EPW hour-ending hour h is mapped to clock-hour bin h - 1.",
+      "language": "typescript",
+      "kind": "lookalike"
+    },
+    {
+      "id": "ts-kbtu-to-kwh-wrong-factor",
+      "file": "src/bem/units.ts",
+      "line": 16,
+      "anchor": "kbtu / 0.29307107",
+      "description": "Dividing by kWh per kBtu inverts the conversion; 1000 kBtu becomes 3412 kWh instead of 293.07 kWh (1 kBtu = 0.29307107 kWh). Fix: kbtu * 0.29307107.",
+      "language": "typescript",
+      "kind": "defect"
+    },
+    {
+      "id": "ts-lookalike-kwh-to-kbtu",
+      "file": "src/bem/units.ts",
+      "line": 20,
+      "anchor": "kwh / 0.29307107",
+      "description": "Correct: dividing kWh by 0.29307107 kWh per kBtu gives kBtu.",
+      "language": "typescript",
+      "kind": "lookalike"
+    },
+    {
+      "id": "ts-leap-year-truncated",
+      "file": "src/bem/climate.ts",
+      "line": 14,
+      "anchor": "i < 8760",
+      "description": "A loop bound of 8760 drops December 31 from a leap-year (8784-hour) EPW, so heating degree-hours omit one winter day. Fix: loop to t.length.",
+      "language": "typescript",
+      "kind": "defect"
+    },
+    {
+      "id": "ts-lookalike-row-count",
+      "file": "src/bem/climate.ts",
+      "line": 21,
+      "anchor": "const days = hours.rowCount / 24",
+      "description": "Correct: the number of days follows the file's record count, 365 or 366.",
+      "language": "typescript",
+      "kind": "lookalike"
+    },
+    {
+      "id": "idf-missing-construction",
+      "file": "models/office.idf",
+      "line": 73,
+      "anchor": "Exterior Wall Insulated,",
+      "description": "Surface Office North Wall references construction Exterior Wall Insulated, which is not defined; validate_model reports a reference to a non-existent object and EnergyPlus stops with a severe error. Fix: define the construction or reference Exterior Wall.",
+      "language": "idf",
+      "kind": "defect"
+    },
+    {
+      "id": "idf-lookalike-case-insensitive-reference",
+      "file": "models/office.idf",
+      "line": 90,
+      "anchor": "exterior wall,",
+      "description": "Correct: EnergyPlus resolves object names case-insensitively, so exterior wall refers to the construction Exterior Wall.",
+      "language": "idf",
+      "kind": "lookalike"
+    }
+  ]
+}

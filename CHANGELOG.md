@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- The `building-energy-sci-review-extension` skill, an extension for the `sci-review` plugin. It adds a building physicist perspective to a scientific code review, covering heat-transfer and psychrometric relations, energy balances, IP and SI conversions and simulation time conventions, and runs `validate_model` and `check_model_integrity` on the IDF and epJSON files under review, without running a simulation or modifying a model. A seeded fixture for it is in `tests/fixtures/sci-review/`.
+
 ## [0.2.0] - 2026-11-02
 
 First tagged release. Version 0.1.0 was never tagged, and its number covered every change listed here, so existing installations did not receive them as updates.
