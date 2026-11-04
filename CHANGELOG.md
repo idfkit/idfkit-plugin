@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-04
+
 ### Added
 
 - The `building-energy-sci-review-extension` skill, an extension for the `sci-review` plugin. It adds a building physicist perspective to a scientific code review, covering heat-transfer and psychrometric relations, energy balances, IP and SI conversions and simulation time conventions, and runs `validate_model` and `check_model_integrity` on the IDF and epJSON files under review, without running a simulation or modifying a model. A seeded fixture for it is in `tests/fixtures/sci-review/`.
@@ -31,5 +33,6 @@ First tagged release. Version 0.1.0 was never tagged, and its number covered eve
 
 - The `--prerelease=allow` flag in `.lsp.json`, because `idfkit-lsp` now depends on a stable idfkit.
 
-[Unreleased]: https://github.com/idfkit/idfkit-plugin/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/idfkit/idfkit-plugin/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/idfkit/idfkit-plugin/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/idfkit/idfkit-plugin/releases/tag/v0.2.0
