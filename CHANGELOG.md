@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-04
+
 ### Fixed
 
 - The building-energy fixture in `tests/fixtures/sci-review/` lists the two defects of `calibration_error` in `src/bem/units.py` that it previously omitted: `zip` pairs simulated and billed months by position and silently truncates a shorter bill series, and the relative error divides by a month billed at zero. A panel that reports them is now credited with detections rather than charged with false positives.
@@ -38,6 +40,7 @@ First tagged release. Version 0.1.0 was never tagged, and its number covered eve
 
 - The `--prerelease=allow` flag in `.lsp.json`, because `idfkit-lsp` now depends on a stable idfkit.
 
-[Unreleased]: https://github.com/idfkit/idfkit-plugin/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/idfkit/idfkit-plugin/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/idfkit/idfkit-plugin/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/idfkit/idfkit-plugin/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/idfkit/idfkit-plugin/releases/tag/v0.2.0
