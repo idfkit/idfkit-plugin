@@ -41,6 +41,24 @@
       "kind": "lookalike"
     },
     {
+      "id": "py-calibration-months-misaligned",
+      "file": "src/bem/units.py",
+      "line": 27,
+      "anchor": "zip(simulated, bill_kwh(bill_kbtu))",
+      "description": "zip pairs simulated and billed months by position and stops at the shorter list without raising; a bill series with one month missing (11 entries) is compared with the wrong simulated months and December is dropped silently. Fix: key both series by billing period, or raise when the lengths differ (zip(..., strict=True)).",
+      "language": "python",
+      "kind": "defect"
+    },
+    {
+      "id": "py-calibration-zero-bill-month",
+      "file": "src/bem/units.py",
+      "line": 27,
+      "anchor": "(s - b) / b",
+      "description": "The relative error divides by the billed quantity, so a month billed at zero (a vacant or unmetered month) raises ZeroDivisionError and aborts the whole series. Fix: report that month as undefined, or use a normalised statistic such as the NMBE and CV(RMSE) of ASHRAE Guideline 14, which divide by the mean billed quantity.",
+      "language": "python",
+      "kind": "defect"
+    },
+    {
       "id": "py-leap-year-truncated",
       "file": "src/bem/climate.py",
       "line": 14,
