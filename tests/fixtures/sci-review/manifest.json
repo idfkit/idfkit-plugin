@@ -1,6 +1,6 @@
 {
   "fixture": "building-energy",
-  "description": "Seeded building-energy defects and correct look-alikes for the sci-review building-energy extension. The main branch holds the baseline; the feature branch adds every entry below.",
+  "description": "Seeded building-energy defects and correct look-alikes for the sci-review building-energy extension. The main branch holds the baseline; the feature branch adds every entry below. Every defect entry carries a boolean domain field, classified by what the defect is, not by who found it: true when recognising the defect requires building-energy knowledge (EnergyPlus or EPW time conventions, energy unit conversions specific to the domain, weather-year conventions, IDF object references); false when a reviewer without that knowledge would recognise it (a general programming or numerical defect). A defect entry without the field is treated as true.",
   "baseline_branch": "main",
   "review_branch": "feature",
   "entries": [
@@ -11,7 +11,8 @@
       "anchor": "profile[t.hour] += v / 3.6e6",
       "description": "EnergyPlus hourly time stamps returned by idfkit mark the end of each interval; binning by t.hour places every interval one hour late (08:00 to 09:00 lands in bin 9) and the last interval of the year in bin 0. Fix: bin by (t - timedelta(hours=1)).hour.",
       "language": "python",
-      "kind": "defect"
+      "kind": "defect",
+      "domain": true
     },
     {
       "id": "py-lookalike-hour-shift",
@@ -29,7 +30,8 @@
       "anchor": "KWH_PER_KBTU = 3.412",
       "description": "3.412 is kBtu per kWh, not kWh per kBtu; a 1000 kBtu bill becomes 3412 kWh instead of 293.07 kWh (1 kBtu = 0.29307107 kWh), a factor of 11.64. Fix: KWH_PER_KBTU = 0.29307107.",
       "language": "python",
-      "kind": "defect"
+      "kind": "defect",
+      "domain": true
     },
     {
       "id": "py-lookalike-kwh-to-kbtu",
@@ -41,13 +43,34 @@
       "kind": "lookalike"
     },
     {
+      "id": "py-calibration-months-misaligned",
+      "file": "src/bem/units.py",
+      "line": 27,
+      "anchor": "zip(simulated, bill_kwh(bill_kbtu))",
+      "description": "zip pairs simulated and billed months by position and stops at the shorter list without raising; a bill series with one month missing (11 entries) is compared with the wrong simulated months and December is dropped silently. Fix: key both series by billing period, or raise when the lengths differ (zip(..., strict=True)).",
+      "language": "python",
+      "kind": "defect",
+      "domain": false
+    },
+    {
+      "id": "py-calibration-zero-bill-month",
+      "file": "src/bem/units.py",
+      "line": 27,
+      "anchor": "(s - b) / b",
+      "description": "The relative error divides by the billed quantity, so a month billed at zero (a vacant or unmetered month) raises ZeroDivisionError and aborts the whole series. Fix: report that month as undefined, or use a normalised statistic such as the NMBE and CV(RMSE) of ASHRAE Guideline 14, which divide by the mean billed quantity.",
+      "language": "python",
+      "kind": "defect",
+      "domain": false
+    },
+    {
       "id": "py-leap-year-truncated",
       "file": "src/bem/climate.py",
       "line": 14,
       "anchor": "dry_bulb_temperature[:8760]",
       "description": "Truncating to 8760 values drops December 31 from a leap-year (8784-hour) EPW, so heating degree-hours omit one winter day. Fix: iterate over every record.",
       "language": "python",
-      "kind": "defect"
+      "kind": "defect",
+      "domain": true
     },
     {
       "id": "py-lookalike-typical-year-guard",
@@ -74,7 +97,8 @@
       "anchor": "sum[hours.hour[i] % 24]",
       "description": "EPW hour h covers h-1 to h; indexing by hour % 24 places every hour one bin late and hour 24 (23:00 to 24:00) in bin 0. Fix: index by hours.hour[i] - 1.",
       "language": "typescript",
-      "kind": "defect"
+      "kind": "defect",
+      "domain": true
     },
     {
       "id": "ts-lookalike-hour-shift",
@@ -92,7 +116,8 @@
       "anchor": "kbtu / 0.29307107",
       "description": "Dividing by kWh per kBtu inverts the conversion; 1000 kBtu becomes 3412 kWh instead of 293.07 kWh (1 kBtu = 0.29307107 kWh). Fix: kbtu * 0.29307107.",
       "language": "typescript",
-      "kind": "defect"
+      "kind": "defect",
+      "domain": true
     },
     {
       "id": "ts-lookalike-kwh-to-kbtu",
@@ -110,7 +135,8 @@
       "anchor": "i < 8760",
       "description": "A loop bound of 8760 drops December 31 from a leap-year (8784-hour) EPW, so heating degree-hours omit one winter day. Fix: loop to t.length.",
       "language": "typescript",
-      "kind": "defect"
+      "kind": "defect",
+      "domain": true
     },
     {
       "id": "ts-lookalike-row-count",
@@ -128,7 +154,8 @@
       "anchor": "Exterior Wall Insulated,",
       "description": "Surface Office North Wall references construction Exterior Wall Insulated, which is not defined; validate_model reports a reference to a non-existent object and EnergyPlus stops with a severe error. Fix: define the construction or reference Exterior Wall.",
       "language": "idf",
-      "kind": "defect"
+      "kind": "defect",
+      "domain": true
     },
     {
       "id": "idf-lookalike-case-insensitive-reference",

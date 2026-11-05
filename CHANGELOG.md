@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The building-energy fixture in `tests/fixtures/sci-review/` lists the two defects of `calibration_error` in `src/bem/units.py` that it previously omitted: `zip` pairs simulated and billed months by position and silently truncates a shorter bill series, and the relative error divides by a month billed at zero. A panel that reports them is now credited with detections rather than charged with false positives.
+- Every defect entry of that fixture's `manifest.json` carries a boolean `domain` field: true when recognising the defect requires building-energy knowledge, false for a general programming or numerical defect. The seven original seeded defects are `true` and the two `calibration_error` defects are `false`, so a scorer can measure building-energy attribution over the domain defects only. A defect entry without the field is treated as `true`.
+
 ## [0.3.0] - 2026-11-04
 
 ### Added

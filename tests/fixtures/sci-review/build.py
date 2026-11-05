@@ -43,6 +43,9 @@ class Entry:
     description: str
     language: str
     kind: str
+    # Defects only: true when recognising the defect requires building-energy knowledge, false for a
+    # general programming or numerical defect. A defect without the field is treated as true.
+    domain: bool | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -413,6 +416,10 @@ def check_anchors(entries: list[Entry], files: dict[str, str]) -> list[str]:
     for entry in entries:
         if entry.kind not in ("defect", "lookalike"):
             problems.append(f"{entry.id}: kind {entry.kind!r} is neither 'defect' nor 'lookalike'")
+        if entry.kind == "defect" and entry.domain is not None and not isinstance(entry.domain, bool):
+            problems.append(f"{entry.id}: domain {entry.domain!r} is not a boolean")
+        if entry.kind != "defect" and entry.domain is not None:
+            problems.append(f"{entry.id}: domain is given on a {entry.kind}, but applies to defects only")
         text = files.get(entry.file)
         if text is None:
             problems.append(f"{entry.id}: file {entry.file} is not written on the feature branch")
@@ -480,7 +487,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     defects = sum(1 for e in entries if e.kind == "defect")
-    print(f"built {out} (branches main and feature); {defects} defects and {len(entries) - defects} look-alikes")
+    domain = sum(1 for e in entries if e.kind == "defect" and e.domain is not False)
+    print(
+        f"built {out} (branches main and feature); {defects} defects ({domain} building-energy) "
+        f"and {len(entries) - defects} look-alikes"
+    )
     print(f"anchors check passed for {len(entries)} manifest entries")
     return 0
 
