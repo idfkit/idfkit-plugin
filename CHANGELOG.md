@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The `envelope-analyst` agent gave roof U-factor targets of 0.027 to 0.063 labelled W/m²·K. Those are ASHRAE 90.1 values in Btu/h·ft²·°F, so the targets were about 5.7 times too strict. The agent now states them in Btu/h·ft²·°F with the SI equivalent of about 0.15 to 0.36 W/m²·K.
+
 ## [0.3.1] - 2026-11-04
 
 ### Fixed
