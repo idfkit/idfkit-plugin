@@ -26,8 +26,9 @@ Claude Code, Cursor, Copilot, Gemini, Codex, and any MCP-capable client.
 | **MCP server** (`uvx idfkit-mcp@<version>`, pinned in `.mcp.json`) | Tools and `idfkit://…` resources to load, query, edit, validate, and simulate IDF / epJSON models. |
 | **`developing-with-idfkit` skill** | Discovers the idfkit installed in your project and loads **version-matched** reference docs for writing Python against the library. |
 | **Workflow skills** | Task playbooks that orchestrate the MCP tools: `simulate`, `validate`, `new-model`, `load-model`, `energy-audit`, `weather`, `upgrade-version`, `idf-conventions`, `docs`. |
+| **`building-energy-sci-review-extension` skill** | Extension consumed by the `sci-review` skill: adds a building physicist perspective, a building-energy reference document and idfkit model checks to a review panel. Not for direct use. |
 | **Agents** | Focused sub-agents: `energy-modeler`, `envelope-analyst`, `hvac-designer`. |
-| **Commands & hooks** | `/quick-sim` slash command; context hooks that nudge agents toward the structured MCP tools when they touch `.idf` / `.epJSON` / `.epw` / `.ddy` files. |
+| **Commands & hooks** | `/quick-sim` slash command; a `SessionStart` hook (`scripts/check-deps.sh`) that checks at startup for `uvx` and an EnergyPlus installation and prints a warning for each one missing; a `PreToolUse` context hook (`scripts/inject-idf-context.sh`) that nudges agents toward the structured MCP tools when they touch `.idf` / `.epJSON` / `.epw` / `.ddy` files. |
 | **LSP** | Python LSP for idfkit-based code (`idfkit-lsp`) via `.lsp.json`. |
 
 > **Note on the LSP.** `idfkit-lsp` is a language server for *Python code that
@@ -59,7 +60,7 @@ docs matched to its pinned idfkit version.
 
 ### Claude Code — full plugin (recommended)
 
-Installs the MCP server, skills, agents, commands, and hooks together:
+Installs the MCP server, the LSP, skills, agents, commands, and hooks together:
 
 ```
 /plugin marketplace add idfkit/idfkit-plugin
@@ -140,8 +141,13 @@ The `developing-with-idfkit` skill runs
 2. Runs `import idfkit; print(idfkit.__path__[0])` to locate the installed package.
 3. Loads `<idfkit_path>/.agents/skills/developing-with-idfkit/SKILL.md` and routes
    into its `references/`.
-4. Falls back with actionable instructions when idfkit is missing (`pip install
-   idfkit`) or predates bundled skills (upgrade, or use docs.idfkit.com).
+4. Falls back with actionable instructions when idfkit is missing or predates
+   bundled skills (upgrade, or use docs.idfkit.com). When idfkit is missing, the
+   instruction names the install command for the environment detected in step 1:
+   `<venv python> -m pip install idfkit` for a virtual environment, `conda install
+   -c conda-forge idfkit`, `pipenv install idfkit`, `poetry add idfkit`,
+   `pdm add idfkit` or `uv add idfkit`; for a system interpreter it names
+   `<python> -m pip install idfkit` and advises creating a virtual environment first.
 
 ## License
 
