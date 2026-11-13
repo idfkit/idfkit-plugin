@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- The `migrating-to-idfkit` skill, which ports a Python codebase from archetypal, eppy or geomeppy to idfkit's native API without silently changing simulation results. It inventories old-library usage (`scripts/inventory.py`), maps the public interface and its downstream consumers, captures a regression baseline under the old stack before any code changes, and ports module by module in dependency order through the superpowers process skills. Its references map old calls to idfkit equivalents and list the behaviours that change results unnoticed, such as duplicate-name handling, schedule weekday mapping, zone naming, default constructions and output objects.
+
 ## [0.3.1] - 2026-11-04
 
 ### Fixed
