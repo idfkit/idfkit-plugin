@@ -19,6 +19,17 @@ name: bump-idfkit
 # checks both pins, so a pull request that moves only one leaves that step waiting until the other
 # is moved by hand.
 #
+# A SERVER'S RELEASE OFFERS THE LEVEL TOO. idfkit-mcp's and idfkit-lsp's notify-dependents.yml
+# dispatch this after each release, with `offered_by` naming that release (`idfkit-lsp 0.5.1`). The
+# level is often one the plugin already runs through the other server, so the pull request's title
+# and body are built from the pins this run actually moves, never from a fixed server: an offer
+# from idfkit-lsp that moves only .lsp.json is titled for idfkit-lsp. A run that moves no pin opens
+# no pull request.
+#
+# A PIN NEVER MOVES BACKWARDS. The two servers are not in lockstep, so an offer can name a level
+# older than the one a server already runs (idfkit-lsp releasing on the level idfkit-mcp has left).
+# That server's pin is kept, and the pull request says so.
+#
 # DECLINING. Give `decline_reason` and nothing is bumped: the run records a deliberate lag in the
 # consumer register instead (FR-024). The reason states a policy, never a version.
 
@@ -31,6 +42,11 @@ on:
         type: string
       decline_reason:
         description: Decline the level instead, recording this policy as a deliberate lag.
+        required: false
+        type: string
+        default: ""
+      offered_by:
+        description: The server release that offered this level, as `<package> <version>`. Empty when idfkit's own release dispatches it.
         required: false
         type: string
         default: ""
@@ -77,7 +93,6 @@ jobs:
           set -euo pipefail
           version="${RAW_VERSION#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "previous=$(python3 -c 'import json;print(json.load(open(".mcp.json"))["mcpServers"]["idfkit"]["args"][0])')" >> "$GITHUB_OUTPUT"
 
       # The consumer register lives in idfkit-conformance, so recording an adoption there is a dispatch
       # into another repository. The organisation's GitHub App (idfkit-bot) mints a token for that one
@@ -112,6 +127,8 @@ jobs:
       - name: Refuse to adopt before idfkit-mcp has
         id: order
         if: inputs.decline_reason == ''
+        env:
+          OFFERED_BY: ${{ inputs.offered_by }}
         run: |
           set +e
           python governance/tools/adoption.py check-order --consumer "$CONSUMER" --library python \
@@ -122,6 +139,12 @@ jobs:
             exit 1
           fi
           if grep -q "provider idfkit-lsp" "$RUNNER_TEMP/order.txt"; then
+            # An offer from idfkit-lsp names a release on this level, so finding none means the index
+            # does not list it yet. Stop red rather than deliver nothing and report success.
+            if [ "${OFFERED_BY%% *}" = "idfkit-lsp" ]; then
+              echo "::error title=Offer not yet listed::$OFFERED_BY offered idfkit ${{ steps.ver.outputs.version }}, and PyPI lists no idfkit-lsp release on that level yet. Dispatch idfkit-lsp's notify-dependents.yml again once it does."
+              exit 1
+            fi
             echo "lsp_waiting=true" >> "$GITHUB_OUTPUT"
             echo "::warning title=LSP unchanged::idfkit-lsp has no release on this level, so .lsp.json does not move."
           fi
@@ -150,20 +173,28 @@ jobs:
           PY
 
       # Text substitution rather than a JSON round trip, so the file keeps its formatting and the
-      # diff is the one version string that changed.
+      # diff is the one version string that changed. A pin newer than the release is kept (see the
+      # header): version_key orders releases numerically, never as text.
       - name: Pin the MCP server to that release
         if: inputs.decline_reason == ''
         env:
           RELEASE: ${{ steps.release.outputs.release }}
         run: |
           python - <<'PY'
-          import os, re
+          import os, re, sys
           from pathlib import Path
-          path = Path(".mcp.json")
-          text, count = re.subn(r'"idfkit-mcp(@[^"]*)?"', f'"idfkit-mcp@{os.environ["RELEASE"]}"', path.read_text())
-          if count != 1:
-              raise SystemExit(f"expected one idfkit-mcp entry in .mcp.json, found {count}")
-          path.write_text(text)
+          sys.path.insert(0, "governance/tools")
+          from adoption import version_key
+          path, release = Path(".mcp.json"), os.environ["RELEASE"]
+          text = path.read_text()
+          current = re.findall(r'"idfkit-mcp(?:@([^"]*))?"', text)
+          if len(current) != 1:
+              raise SystemExit(f"expected one idfkit-mcp entry in .mcp.json, found {len(current)}")
+          if current[0] and version_key(current[0]) > version_key(release):
+              print(f"::notice title=MCP pin kept::.mcp.json pins idfkit-mcp {current[0]}, newer than {release}, "
+                    "its newest release on this level. A pin never moves backwards.")
+              raise SystemExit(0)
+          path.write_text(re.sub(r'"idfkit-mcp(@[^"]*)?"', f'"idfkit-mcp@{release}"', text))
           PY
 
       # The same substitution for the language server, whose pin is the `--from` argument.
@@ -173,13 +204,20 @@ jobs:
           RELEASE: ${{ steps.release.outputs.lsp_release }}
         run: |
           python - <<'PY'
-          import os, re
+          import os, re, sys
           from pathlib import Path
-          path = Path(".lsp.json")
-          text, count = re.subn(r'"idfkit-lsp(==[^"]*)?"', f'"idfkit-lsp=={os.environ["RELEASE"]}"', path.read_text())
-          if count != 1:
-              raise SystemExit(f"expected one idfkit-lsp entry in .lsp.json, found {count}")
-          path.write_text(text)
+          sys.path.insert(0, "governance/tools")
+          from adoption import version_key
+          path, release = Path(".lsp.json"), os.environ["RELEASE"]
+          text = path.read_text()
+          current = re.findall(r'"idfkit-lsp(?:==([^"]*))?"', text)
+          if len(current) != 1:
+              raise SystemExit(f"expected one idfkit-lsp entry in .lsp.json, found {len(current)}")
+          if current[0] and version_key(current[0]) > version_key(release):
+              print(f"::notice title=LSP pin kept::.lsp.json pins idfkit-lsp {current[0]}, newer than {release}, "
+                    "its newest release on this level. A pin never moves backwards.")
+              raise SystemExit(0)
+          path.write_text(re.sub(r'"idfkit-lsp(==[^"]*)?"', f'"idfkit-lsp=={release}"', text))
           PY
 
       - name: Run the tests
@@ -188,8 +226,93 @@ jobs:
         continue-on-error: true
         run: python -m unittest tests.discovery.test_discover -v
 
-      - name: Open the pull request
+      # The title and body name the servers whose pins moved, read from the files against the base
+      # commit, so an offer that finds .mcp.json already on the level does not claim to move it.
+      - name: Describe the pins that moved
+        id: describe
         if: inputs.decline_reason == ''
+        env:
+          LEVEL: ${{ steps.ver.outputs.version }}
+          OFFERED_BY: ${{ inputs.offered_by }}
+          TESTS: ${{ steps.tests.outcome }}
+          MCP_RELEASE: ${{ steps.release.outputs.release }}
+          LSP_RELEASE: ${{ steps.release.outputs.lsp_release }}
+        run: |
+          python - <<'PY'
+          import os, re, subprocess
+          from dataclasses import dataclass
+          from pathlib import Path
+
+          @dataclass(frozen=True)
+          class Pin:
+              package: str
+              path: str
+              pattern: str
+              release: str  # the newest release on this level; empty when the server has none yet
+
+              def read(self, text: str) -> str:
+                  match = re.search(self.pattern, text)
+                  if match is None:
+                      raise SystemExit(f"no {self.package} entry in {self.path}")
+                  return match.group(1) or "unpinned"
+
+              def before(self) -> str:
+                  return self.read(subprocess.run(["git", "show", f"HEAD:{self.path}"], check=True,
+                                                  capture_output=True, text=True).stdout)
+
+              def after(self) -> str:
+                  return self.read(Path(self.path).read_text())
+
+          @dataclass(frozen=True)
+          class Move:
+              pin: Pin
+              old: str
+              new: str
+
+              @property
+              def moved(self) -> bool:
+                  return self.old != self.new
+
+              def line(self) -> str:
+                  p = self.pin
+                  if self.moved:
+                      return f"- `{p.path}`: moves {p.package} from {self.old} to {self.new}, its newest release on this level."
+                  if not p.release:
+                      return (f"- `{p.path}`: {p.package} unchanged at {self.old}. {p.package} has no release on this level "
+                              "yet; move it by hand once it has one. The EnergyPlus delivery-pins step waits on both pins.")
+                  if self.old != p.release:
+                      return (f"- `{p.path}`: {p.package} kept at {self.old}, newer than {p.release}, its newest release "
+                              "on this level. A pin never moves backwards.")
+                  return f"- `{p.path}`: {p.package} unchanged at {self.old}, already on this level."
+
+          pins = [Pin("idfkit-mcp", ".mcp.json", r'"idfkit-mcp(?:@([^"]+))?"', os.environ["MCP_RELEASE"]),
+                  Pin("idfkit-lsp", ".lsp.json", r'"idfkit-lsp(?:==([^"]+))?"', os.environ["LSP_RELEASE"])]
+          level, offered_by = os.environ["LEVEL"], os.environ["OFFERED_BY"].strip()
+          moves = [Move(p, p.before(), p.after()) for p in pins]
+          moved = [m for m in moves if m.moved]
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              if not moved:
+                  print(f"::notice title=Nothing to deliver::No server pin moves on idfkit {level}.")
+                  print("\n".join(m.line() for m in moves))
+                  out.write("moved=false\n")
+                  raise SystemExit(0)
+
+              title = "Deliver " + " and ".join(f"{m.pin.package} {m.new}" for m in moved) + f" (idfkit {level})"
+              lines = [f"{offered_by} was released on idfkit {level}." if offered_by else f"idfkit {level} was released.",
+                       "This pull request moves the plugin's server pins as follows:", "",
+                       *(m.line() for m in moves), "",
+                       "Every user who installs or updates the plugin after this merges runs the moved "
+                       + ("server." if len(moved) == 1 else "servers."), "",
+                       f"- Discovery tests: `{os.environ['TESTS']}`", "",
+                       ("Offered by " + offered_by.split()[0] + "'s notify-dependents.yml" if offered_by
+                        else "Opened by idfkit's notify-downstream.yml") + "; it never merges itself."]
+              Path(os.environ["RUNNER_TEMP"], "pr-body.md").write_text("\n".join(lines) + "\n")
+              out.write(f"moved=true\ntitle={title}\n")
+          PY
+
+      - name: Open the pull request
+        if: inputs.decline_reason == '' && steps.describe.outputs.moved == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
           branch: bot/bump-idfkit-${{ steps.ver.outputs.version }}
@@ -198,16 +321,7 @@ jobs:
           add-paths: |
             .mcp.json
             .lsp.json
-          title: "Deliver idfkit-mcp ${{ steps.release.outputs.release }} (idfkit ${{ steps.ver.outputs.version }})"
-          commit-message: "Deliver idfkit-mcp ${{ steps.release.outputs.release }} (idfkit ${{ steps.ver.outputs.version }})"
+          title: ${{ steps.describe.outputs.title }}
+          commit-message: ${{ steps.describe.outputs.title }}
           reviewers: samuelduchesne
-          body: |
-            idfkit ${{ steps.ver.outputs.version }} was released, and idfkit-mcp ${{ steps.release.outputs.release }}
-            pins it, so `.mcp.json` moves from `${{ steps.ver.outputs.previous }}` to
-            `idfkit-mcp@${{ steps.release.outputs.release }}`. Every user who installs or updates the
-            plugin after this merges runs that server.
-
-            - Discovery tests: `${{ steps.tests.outcome }}`
-            - Language server: ${{ steps.release.outputs.lsp_release != '' && format('`.lsp.json` moves to `idfkit-lsp=={0}`, the newest idfkit-lsp release on this level.', steps.release.outputs.lsp_release) || 'unchanged. idfkit-lsp has no release on this level yet. Move `.lsp.json` by hand once it has one; the EnergyPlus delivery-pins step waits on both pins.' }}
-
-            Opened by idfkit's notify-downstream.yml; it never merges itself.
+          body-path: ${{ runner.temp }}/pr-body.md

@@ -82,6 +82,9 @@ depending on `idfkit-mcp` and `idfkit-lsp`, and adopting in wave 2 after them.
   `check-consumer.yml` at a pinned governance tag and fails if the register no
   longer describes this repository.
 - **Adoption.** `bump-idfkit.yml` refuses to adopt an idfkit level until
-  idfkit-mcp has published a release pinning it, naming it, then moves the pin
-  in `.mcp.json` and opens a pull request. `rehearse-candidate.yml` rehearses
+  idfkit-mcp has published a release pinning it, naming it, then moves the pins
+  in `.mcp.json` and `.lsp.json` to each server's newest release on that level
+  and opens a pull request when a pin moves. A pin never moves backwards. Each
+  server's release dispatches it too, naming itself in `offered_by`.
+  `rehearse-candidate.yml` rehearses
   through the two servers, since this repository holds no code that calls idfkit.
