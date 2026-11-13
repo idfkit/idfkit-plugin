@@ -29,7 +29,8 @@ Bundled with this skill:
 3. Split the public interface into two layers and say so plainly:
    - **Inputs and computed results** (pydantic models, plain pandas frames, numbers): these can and should stay identical.
    - **Old-library objects that leak out** (`.idf`, `.sql`, callbacks typed on `IDF`, `add_to_idf(idf)` methods): these break on purpose. Plan a major version bump, and give each consumer-facing leak a project-owned replacement (in epinterface's migration, a `hourly_timeseries(names)` method instead of exposing `Sql.timeseries_by_name`), never an eppy-shaped shim.
-4. Note the EnergyPlus versions CI runs, whether a base IDF file is loaded and migrated, and which old-library behaviours the code depends on implicitly (`pitfalls.md` lists what to look for).
+4. Look for **mirror classes**: project classes that each copy one EnergyPlus object (pydantic models or dataclasses named `Material`, `People`, `RunPeriod`, … with eppy-style fields and an `add(idf)` method). eppy validated nothing, so codebases grew them to get typed fields. idfkit validates every field against the schema, so they become duplicates once the port lands. Count them; they are the subject of task 11.
+5. Note the EnergyPlus versions CI runs, whether a base IDF file is loaded and migrated, and which old-library behaviours the code depends on implicitly (`pitfalls.md` lists what to look for).
 
 ## Phase 2: Brainstorm the contract (superpowers:brainstorming)
 
@@ -57,6 +58,7 @@ Use this task order; adapt names to the codebase. Each task's tests must be gree
 8. **Build, simulate, run**: the regression test turns green again here.
 9. **Legacy paths** (older builders, CLIs, notebooks, scripts).
 10. **Remove the old dependencies**, declare transitive deps they used to provide, changelog with the breaking list and the consumer migration snippet, version bump.
+11. **Retire mirror classes** (if recon found them), once parity holds. Replace each with direct `doc.add(type, name, **snake_case_fields)` calls at its call sites, and keep only real helpers (reuse-or-replace writer, version-renamed field lookup, domain libraries). Carry every non-schema default over explicitly. Gate it with byte-identical IDF snapshots (`baseline-and-parity.md`), not the simulation tolerance: the written model must not change at all. Domain models that consumers use (components stored in a database, say) are not mirrors; keep them.
 
 Tasks 5-8 share the model object, so between them, tests of not-yet-ported modules fail. Say this in the plan as an explicit ruling ("tests of ported code and unrelated tests must pass; end-to-end tests may fail until task 8") so neither implementers nor reviewers chase it.
 
@@ -78,6 +80,7 @@ Before offering merge or PR options (superpowers:finishing-a-development-branch)
 - Run the final whole-branch review and give it the consumer's actual call sites to walk.
 - Re-run `inventory.py` and expect zero old-library imports and no old-API calls apart from idfkit's own `removeidfobject` and `copyidfobject` (idfkit's other eppy-shaped methods would otherwise keep un-ported code running silently).
 - Check pre-commit and CI **against the main branch**, not against an earlier commit of the migration branch. Formatter churn and new fixtures are the usual culprits.
+- Search every written IDF for `np.` (tests and snapshots): numpy scalars reach the IDF text as `np.float64(...)` only for some values (see `pitfalls.md`).
 - Run the suite (or at least no-simulation tests) under every EnergyPlus version CI uses; field names differ across schema versions. `idfkit check --targets …` lints models across versions.
 - Benchmark old against new on the same machine and the same model: import time, first build in a fresh process, later builds, and a full run. Report results equality alongside. The first build in a fresh process is where a base-file migration hides (tens of seconds).
 - List every decision made on the user's behalf, each with its cost if wrong, and the follow-ups that change results (they need their own baseline and sign-off).

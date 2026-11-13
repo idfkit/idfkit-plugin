@@ -29,7 +29,15 @@ Each of these surfaced in a real archetypal/geomeppy → idfkit migration. Put t
 - **Open SQLite handles.** `SQLResult` keeps its connection open; close it (`SimulationResult.close()`, or `with` blocks) or copy the file out before temporary directories are removed (Windows fails otherwise). If results must stay readable after a run in a temp dir, copy the `.sql` out and document it.
 - **Schema differences across EnergyPlus versions.** Field names change between versions; a test hard-coding one name breaks the CI job for another version. Resolve names from the document's schema, and run no-simulation tests under each CI version.
 - **Silent field filtering.** A helper that drops fields unknown to a schema hides typos on every version. Allow only explicit, version-gated absences; everything else should reach `doc.add` and fail loudly.
+- **numpy scalars in `doc.add`.** idfkit 1.2 accepts a numpy `float64` (it subclasses `float`) and writes it through `repr()` when the value has no short form: `0.1` writes as `0.1`, but `0.30000000000000004` writes as `np.float64(0.30000000000000004)`, which EnergyPlus cannot read. A numpy `float32` is rejected outright. pydantic models used to convert these silently, so the problem appears exactly when such wrappers are removed, and only for some computed values: round-numbered fixtures hide it. Convert computed values with `float()` where they reach `doc.add`, and assert that written IDFs contain no `np.`.
 - **Large schedules.** Generated object names past 99 (`d_X_100`) broke a `\d\d` regex. Use `\d{2,}`.
+
+## After parity: retiring mirror classes
+
+- Classes that mirror one EnergyPlus object each (eppy-style fields, an `add(idf)` method) survive a straight port because a translation layer can map their field names to idfkit's. That layer is the sign they are duplicates: idfkit already validates the fields. Retire them as a separate step after parity, gated by byte-identical IDF snapshots.
+- Their defaults are not EnergyPlus's (radiant fractions, infiltration coefficients, ideal-loads limits, computed week-schedule day slots). Carry each one over explicitly at the call site; the snapshot gate catches any that are missed.
+- Keep consumer-facing attribute names where consumers read them (e.g. a type-limits table read as `.Lower_Limit_Value`), even on the replacement data class.
+- Unit tests of the mirrors' round trip (`extract()`) go with them; test the helpers that remain instead.
 
 ## Process traps
 
