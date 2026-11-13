@@ -2,7 +2,7 @@
 
 Checked against idfkit 1.2. Signatures drift between releases: re-verify each row you rely on in the version-matched developing-with-idfkit references for the project's installed idfkit.
 
-**What "native" means.** `IDFDocument` itself mixes in eppy-shaped methods (`idfobjects`, `getobject`, `newidfobject`, `copyidfobject`, `addidfobject`, `removeallidfobjects`, `saveas`, `run`, …) from `idfkit._compat`, so old call sites can keep "working" after `IDF` is replaced, and strict mode even tolerates eppy-cased field names (`zone.X_Origin` reads `None` instead of raising). Do not call those methods, and do not write project-level wrappers that mimic them. `doc.removeidfobject(obj)` is the one exception: it is idfkit's own documented removal method. (`idfkit.compat` is something else: the cross-version linter, `idfkit check --targets …`, which is useful for the multi-version CI step.)
+**What "native" means.** `IDFDocument` itself mixes in eppy-shaped methods (`idfobjects`, `getobject`, `newidfobject`, `copyidfobject`, `addidfobject`, `removeallidfobjects`, `saveas`, `run`, …) from `idfkit._compat`, so old call sites can keep "working" after `IDF` is replaced, and strict mode even tolerates eppy-cased field names (`zone.X_Origin` reads `None` instead of raising). Do not call those methods, and do not write project-level wrappers that mimic them. Two are exceptions, because idfkit uses them as its own primitives: `doc.removeidfobject(obj)` (its documented removal method) and `doc.copyidfobject(obj, new_name=...)` (its copy method; idfkit's own `DesignDayManager.apply_to_model` copies design days with it). (`idfkit.compat` is something else: the cross-version linter, `idfkit check --targets …`, which is useful for the multi-version CI step.)
 
 ## Contents
 
@@ -25,7 +25,7 @@ Checked against idfkit 1.2. Signatures drift between releases: re-verify each ro
 | `obj.Zone_Name` | `obj.zone_name` | snake_case epJSON field names. Some names differ across EnergyPlus versions (e.g. Lights `watts_per_zone_floor_area` up to 23.2, `watts_per_floor_area` from 24.1); resolve per document schema. |
 | extensible fields (`obj.Zone_1_Name`, …) | the object's extensible wrapper (e.g. `zones=[{"zone_name": ...}]`) | See the document-and-objects reference. |
 | `idf.removeidfobject(obj)` | `doc.removeidfobject(obj)` | idfkit's own documented method. Removing and re-adding an object drops idfkit's reference-index edges pointing at it. |
-| `idf.copyidfobject(obj)` | `f = obj.to_dict(); f.pop("name", None); doc.add(obj.obj_type, new_name or obj.name, f)` | `to_dict()` includes `"name"`, which `doc.add` rejects as an unknown field. Copying within the same document needs a new name. |
+| `idf.copyidfobject(obj)` / `idf.addidfobject(other_doc_obj)` | `doc.copyidfobject(obj, new_name=...)` | Copies across documents too (e.g. design days from a DDY document). Copying within the same document needs `new_name`. Don't rebuild a copy from `obj.to_dict()`: it includes `"name"`, which `doc.add` rejects as a field. |
 | `idf.saveas(path)` / `idf.idfstr()` | `idfkit.save_idf(doc, path)` / `idfkit.write_idf(doc)` (returns a string) | Both default to `ordering="sorted"` by object type, which matters when diffing against an eppy-written file. |
 | object counts, deep copies | `doc.keys()`, `doc.all_objects` (a property), `doc.copy()` (deep copy) | |
 

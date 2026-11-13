@@ -13,7 +13,8 @@ Reports, without importing the project:
   (tests are listed separately).
 
 Re-run it at the end of a migration: old-library imports should be gone, and the
-only old-API name left should be `removeidfobject`, which is idfkit's own method.
+only old-API names left should be `removeidfobject` and `copyidfobject`, which
+idfkit uses as its own primitives (they are reported separately).
 
 Standard library only, so it runs before any dependency is installed.
 """
@@ -33,8 +34,8 @@ OLD_LIBS = ("archetypal", "eppy", "geomeppy")
 # Attribute calls that indicate old-library model/results usage. Names such as
 # simulate/rotate/scale/translate can also match the project's own methods.
 OLD_CALLS = (
-    "idfobjects", "getobject", "newidfobject", "removeidfobject", "removeallidfobjects",
-    "copyidfobject", "addidfobject", "addidfobjects", "saveas", "idfstr", "simulate",
+    "idfobjects", "getobject", "newidfobject", "removeallidfobjects",
+    "addidfobject", "addidfobjects", "saveas", "idfstr", "simulate",
     "sql_file", "simulation_files", "as_version", "add_block", "add_shading_block",
     "intersect_match", "set_wwr", "set_default_constructions", "bounding_box",
     "translate", "rotate", "scale", "to_year_week_day", "to_epbunch", "from_epbunch",
@@ -44,6 +45,9 @@ OLD_CALLS = (
 OLD_TYPES = ("IDF", "Sql", "EpBunch", "Schedule", "ScheduleTypeLimits", "EnergyPlusVersion", "EnergyDataFrame")
 SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".tox", ".mypy_cache", ".ruff_cache"}
 CALL_RE = re.compile(r"\.(%s)\b" % "|".join(OLD_CALLS))
+# eppy-named methods that idfkit itself uses as primitives: shared names, so not
+# counted as leftovers, but listed so their use on old-library objects can be checked.
+SHARED_CALLS = ("removeidfobject", "copyidfobject")
 IMPORT_RE = re.compile(r"^\s*(?:from|import)\s+(%s)\b[\w.]*" % "|".join(OLD_LIBS), re.M)
 
 
@@ -117,6 +121,7 @@ def surface_entries(tree: ast.Module, types: set[str]):
 def scan(root: Path) -> dict:
     importers: dict[str, list[str]] = {}
     calls: Counter[str] = Counter()
+    shared: Counter[str] = Counter()
     constructors: Counter[str] = Counter()
     per_file: dict[str, int] = defaultdict(int)
     surface: list[dict] = []
@@ -134,9 +139,18 @@ def scan(root: Path) -> dict:
                 unparsable.append(rel)
         if modules:
             importers[rel] = sorted(modules)
-        for m in CALL_RE.finditer(src):
-            calls[m.group(1)] += 1
-            per_file[rel] += 1
+        if tree is None:
+            # Unparsable source: fall back to text matching (comments included).
+            attr_names = [m.group(1) for m in re.finditer(r"\.(\w+)\b", src)]
+        else:
+            # Attribute names in code only, so comments and strings don't count.
+            attr_names = [n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)]
+        for name in attr_names:
+            if name in OLD_CALLS:
+                calls[name] += 1
+                per_file[rel] += 1
+            elif name in SHARED_CALLS:
+                shared[name] += 1
         if tree is None or not bound:
             continue
         for node in ast.walk(tree):
@@ -153,6 +167,7 @@ def scan(root: Path) -> dict:
         "importers": importers,
         "calls": dict(calls.most_common()),
         "constructor_calls": dict(constructors.most_common()),
+        "shared_calls": dict(shared.most_common()),
         "hotspots": sorted(({"file": f, "calls": n} for f, n in per_file.items()), key=lambda d: (-d["calls"], d["file"])),
         "breaking_surface": [s for s in surface if not s["test"]],
         "test_surface": [s for s in surface if s["test"]],
@@ -166,6 +181,9 @@ def print_report(report: dict) -> None:
         print(f"  {f}: {', '.join(mods)}")
     print("\nOld-library attribute calls (name: count):")
     for name, n in report["calls"].items():
+        print(f"  {name}: {n}")
+    print("\nShared eppy/idfkit method names (fine on idfkit documents; check they are not called on old-library objects):")
+    for name, n in report["shared_calls"].items():
         print(f"  {name}: {n}")
     print("\nConstructor/function calls of names imported from the old libraries:")
     for name, n in report["constructor_calls"].items():

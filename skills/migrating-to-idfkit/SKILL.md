@@ -76,7 +76,7 @@ Recommend subagent-driven execution: tasks hand each other exact signatures, and
 Before offering merge or PR options (superpowers:finishing-a-development-branch):
 
 - Run the final whole-branch review and give it the consumer's actual call sites to walk.
-- Re-run `inventory.py` and expect zero old-library imports and no old-API calls apart from `removeidfobject` (idfkit's eppy-shaped methods would otherwise keep un-ported code running silently).
+- Re-run `inventory.py` and expect zero old-library imports and no old-API calls apart from idfkit's own `removeidfobject` and `copyidfobject` (idfkit's other eppy-shaped methods would otherwise keep un-ported code running silently).
 - Check pre-commit and CI **against the main branch**, not against an earlier commit of the migration branch. Formatter churn and new fixtures are the usual culprits.
 - Run the suite (or at least no-simulation tests) under every EnergyPlus version CI uses; field names differ across schema versions. `idfkit check --targets …` lints models across versions.
 - Benchmark old against new on the same machine and the same model: import time, first build in a fresh process, later builds, and a full run. Report results equality alongside. The first build in a fresh process is where a base-file migration hides (tens of seconds).

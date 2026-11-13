@@ -12,7 +12,7 @@ Each of these surfaced in a real archetypal/geomeppy → idfkit migration. Put t
 - **Default constructions.** geomeppy created default constructions; idfkit only assigns a name.
 - **Windows and shading.** `set_wwr` has no surface list (type and orientation only) and rejects `wwr=0`; `add_shading_block` adds a top cap (`<name> Top`) that geomeppy didn't write. Both libraries write `Shading:Site:Detailed`.
 - **Output objects.** archetypal's `prep_outputs` added outputs (and an odd filter that let extra meters through). Reproduce from a captured IDF; compare per object type in both directions. idfkit's `simulate` injects `Output:SQLite` into the copy it runs if missing.
-- **Eppy-shaped methods still exist.** `IDFDocument` carries eppy-compatible methods (`idfobjects`, `getobject`, `newidfobject`, …) and tolerates eppy-cased field names, so un-ported call sites keep running and read `None`. Re-run the inventory at the end and expect zero old-API hits apart from `removeidfobject`.
+- **Eppy-shaped methods still exist.** `IDFDocument` carries eppy-compatible methods (`idfobjects`, `getobject`, `newidfobject`, …) and tolerates eppy-cased field names, so un-ported call sites keep running and read `None`. Re-run the inventory at the end and expect no old-API hits apart from idfkit's own `removeidfobject` and `copyidfobject`.
 - **Old-library bugs.** geomeppy mis-paired surfaces for some storey heights (an outdoor wall became a partition and lost its window). Decide explicitly: reproduce, or keep the correct result and pin the difference in a test, then tell the user which inputs change.
 
 ## Nondeterminism in the old stack
