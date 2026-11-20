@@ -28,7 +28,7 @@ Bundled with this skill:
 2. Find the **downstream consumers** (other repos, notebooks, services that import this package) and read what they actually call. Ask the user for them if they are not obvious; offer to clone them. In practice consumers use far less than the full public API, and often only one or two lines touch old-library objects. That changes the scope from "breaking rewrite" to "one-line migration for consumers".
 3. Split the public interface into two layers and say so plainly:
    - **Inputs and computed results** (pydantic models, plain pandas frames, numbers): these can and should stay identical.
-   - **Old-library objects that leak out** (`.idf`, `.sql`, callbacks typed on `IDF`, `add_to_idf(idf)` methods): these break on purpose. Plan a major version bump, and give each consumer-facing leak a project-owned replacement (in epinterface's migration, a `hourly_timeseries(names)` method instead of exposing `Sql.timeseries_by_name`), never an eppy-shaped shim.
+   - **Old-library objects that leak out** (`.idf`, `.sql`, callbacks typed on `IDF`, `add_to_idf(idf)` methods): these break on purpose. Flag them as breaking in the changelog (the version number is the maintainers' call, not yours), and give each consumer-facing leak a project-owned replacement (in epinterface's migration, a `hourly_timeseries(names)` method instead of exposing `Sql.timeseries_by_name`), never an eppy-shaped shim.
 4. Look for **mirror classes**: project classes that each copy one EnergyPlus object (pydantic models or dataclasses named `Material`, `People`, `RunPeriod`, … with eppy-style fields and an `add(idf)` method). eppy validated nothing, so codebases grew them to get typed fields. idfkit validates every field against the schema, so they become duplicates once the port lands. Count them; they are the subject of task 11.
 5. Note the EnergyPlus versions CI runs, whether a base IDF file is loaded and migrated, and which old-library behaviours the code depends on implicitly (`pitfalls.md` lists what to look for).
 
@@ -49,7 +49,7 @@ Write the design doc, review it yourself (or with a fresh subagent), and get the
 Use this task order; adapt names to the codebase. Each task's tests must be green when it lands, except the expected red window described below.
 
 1. **Baseline capture (old stack still installed).** See `baseline-and-parity.md`. Includes a sanity check that the baseline models are physically plausible, and a new consumer-facing method implemented on the old stack so the regression test already uses the final API.
-2. **Dependency + settings.** Add idfkit (pin a minor series, e.g. `>=1.2,<1.3`, because parity is only proven for the version you test). Replace `EnergyPlusVersion` with version tuples and `find_energyplus`. Which EnergyPlus version to use by default is a contract decision; in epinterface the newest installed version the code had per-version tables for worked, where the newest installed one crashed.
+2. **Dependency + settings.** Add idfkit (pin a minor series, e.g. `>=1.3,<1.4`, because parity is only proven for the version you test; a release-candidate pin such as `>=1.3.0rc2,<1.4` must move to the final release before merging). Replace `EnergyPlusVersion` with version tuples and `find_energyplus`. Which EnergyPlus version to use by default is a contract decision; in epinterface the newest installed version the code had per-version tables for worked, where the newest installed one crashed.
 3. **Results reading.** Replace archetypal `Sql` with idfkit `SQLResult` plus small project-owned frame builders that reproduce the old frame shape exactly. This can land while the old stack still builds models, so the suite stays green.
 4. **Document and schedule helpers.** Build the base document programmatically (`new_document(version)` plus `doc.add`); do not load-and-migrate a packaged IDF. Add a value-schedule writer that reproduces the old schedule objects exactly. These are new modules; nothing is rewired yet.
 5. **Object writers** (the lowest layer that takes the model object).
@@ -57,8 +57,9 @@ Use this task order; adapt names to the codebase. Each task's tests must be gree
 7. **Geometry** (zones, surfaces, windows, shading, matching, rotation).
 8. **Build, simulate, run**: the regression test turns green again here.
 9. **Legacy paths** (older builders, CLIs, notebooks, scripts).
-10. **Remove the old dependencies**, declare transitive deps they used to provide, changelog with the breaking list and the consumer migration snippet, version bump.
+10. **Remove the old dependencies**, declare transitive deps they used to provide, and write the changelog under `Unreleased` with the breaking list and the consumer migration snippet. Do not bump the version or name a release: that is the maintainers' decision.
 11. **Retire mirror classes** (if recon found them), once parity holds. Replace each with direct `doc.add(type, name, **snake_case_fields)` calls at its call sites, and keep only real helpers (reuse-or-replace writer, version-renamed field lookup, domain libraries). Carry every non-schema default over explicitly. Gate it with byte-identical IDF snapshots (`baseline-and-parity.md`), not the simulation tolerance: the written model must not change at all. Domain models that consumers use (components stored in a database, say) are not mirrors; keep them.
+12. **Type the code per EnergyPlus release** (idfkit ≥ 1.3), once parity holds, behind the same byte-identical gate. Annotate documents with the union of the release types the project supports, create objects through their typed collection, annotate objects with the `Any<Class>` stub classes, and run `idfkit check --targets <releases>` in pre-commit and CI. See `api-mapping.md` §8. Expect the type checker to find real bugs (fields one supported release names differently, code reading a field its object type does not have); fix them as separate, reviewed changes.
 
 Tasks 5-8 share the model object, so between them, tests of not-yet-ported modules fail. Say this in the plan as an explicit ruling ("tests of ported code and unrelated tests must pass; end-to-end tests may fail until task 8") so neither implementers nor reviewers chase it.
 
@@ -68,7 +69,7 @@ Put the pitfalls that apply to a task *in that task's text*: implementers only s
 
 Recommend subagent-driven execution: tasks hand each other exact signatures, and during the red window only per-task review catches a wrong turn. Things that made it work:
 
-- Brief every implementer to read `api-mapping.md` and the relevant developing-with-idfkit references, to use the native API only, and to stop and report rather than loosen a tolerance or reproduce a bug by guessing.
+- Brief every implementer to read `api-mapping.md` and the relevant developing-with-idfkit references, to use the native API only (create objects through their typed collection, `doc["Zone"].add(name, ...)`, not `doc.add("Zone", ...)`), and to stop and report rather than loosen a tolerance or reproduce a bug by guessing.
 - Give reviewers **named risks** for the task, drawn from `pitfalls.md` (duplicate-name semantics, type-limits objects, weekday mapping, zone naming, units, output objects, connection lifetime), and the reference artefacts (captured IDFs, fixtures) to check against.
 - Use stronger models for geometry and build/simulate tasks and their reviews; they need judgement.
 - When an implementer finds the old library doing something wrong (wrong surface pairing, nondeterministic ordering), decide explicitly between reproducing it for parity and fixing it, record the decision, and pin the difference in a test. Do not let it slide by silently. Fixes that change results become separate follow-ups unless the user wants them now.
@@ -79,6 +80,7 @@ Before offering merge or PR options (superpowers:finishing-a-development-branch)
 
 - Run the final whole-branch review and give it the consumer's actual call sites to walk.
 - Re-run `inventory.py` and expect zero old-library imports and no old-API calls apart from idfkit's own `removeidfobject` and `copyidfobject` (idfkit's other eppy-shaped methods would otherwise keep un-ported code running silently).
+- Expect no `doc.add("Type", ...)` left (typed collections instead), pyright clean, and `idfkit check --targets <releases>` clean.
 - Check pre-commit and CI **against the main branch**, not against an earlier commit of the migration branch. Formatter churn and new fixtures are the usual culprits.
 - Search every written IDF for `np.` (tests and snapshots): numpy scalars reach the IDF text as `np.float64(...)` only for some values (see `pitfalls.md`).
 - Run the suite (or at least no-simulation tests) under every EnergyPlus version CI uses; field names differ across schema versions. `idfkit check --targets …` lints models across versions.

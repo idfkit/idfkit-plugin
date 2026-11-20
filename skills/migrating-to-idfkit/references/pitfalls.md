@@ -29,7 +29,8 @@ Each of these surfaced in a real archetypal/geomeppy → idfkit migration. Put t
 - **Open SQLite handles.** `SQLResult` keeps its connection open; close it (`SimulationResult.close()`, or `with` blocks) or copy the file out before temporary directories are removed (Windows fails otherwise). If results must stay readable after a run in a temp dir, copy the `.sql` out and document it.
 - **Schema differences across EnergyPlus versions.** Field names change between versions; a test hard-coding one name breaks the CI job for another version. Resolve names from the document's schema, and run no-simulation tests under each CI version.
 - **Silent field filtering.** A helper that drops fields unknown to a schema hides typos on every version. Allow only explicit, version-gated absences; everything else should reach `doc.add` and fail loudly.
-- **numpy scalars in `doc.add`.** idfkit 1.2 accepts a numpy `float64` (it subclasses `float`) and writes it through `repr()` when the value has no short form: `0.1` writes as `0.1`, but `0.30000000000000004` writes as `np.float64(0.30000000000000004)`, which EnergyPlus cannot read. A numpy `float32` is rejected outright. pydantic models used to convert these silently, so the problem appears exactly when such wrappers are removed, and only for some computed values: round-numbered fixtures hide it. Convert computed values with `float()` where they reach `doc.add`, and assert that written IDFs contain no `np.`.
+- **numpy scalars in `doc.add`.** idfkit (1.2, still in 1.3.0rc2) accepts a numpy `float64` (it subclasses `float`) and writes it through `repr()` when the value has no short form: `0.1` writes as `0.1`, but `0.30000000000000004` writes as `np.float64(0.30000000000000004)`, which EnergyPlus cannot read. A numpy `float32` is rejected outright. pydantic models used to convert these silently, so the problem appears exactly when such wrappers are removed, and only for some computed values: round-numbered fixtures hide it. Convert computed values with `float()` where they reach `doc.add`, and assert that written IDFs contain no `np.`.
+- **NaN refused (1.3).** From 1.3, `add()`, `update()` and assignment refuse NaN and infinity (`InvalidFieldError`), where earlier versions wrote `nan`. Values read from spreadsheets or pandas often carry NaN for "not set": map them to `None` (or `fillna`) before writing.
 - **Large schedules.** Generated object names past 99 (`d_X_100`) broke a `\d\d` regex. Use `\d{2,}`.
 
 ## After parity: retiring mirror classes
@@ -39,9 +40,20 @@ Each of these surfaced in a real archetypal/geomeppy → idfkit migration. Put t
 - Keep consumer-facing attribute names where consumers read them (e.g. a type-limits table read as `.Lower_Limit_Value`), even on the replacement data class.
 - Unit tests of the mirrors' round trip (`extract()`) go with them; test the helpers that remain instead.
 
+## Upgrading idfkit mid-migration
+
+- A new idfkit release can change the written IDF on its own. 1.3.0rc2 wrote choice values in the schema's spelling (`Autosize`, `Counterclockwise`), padded `HVACTemplate:*` objects with blank trailing fields, and reversed clockwise shading footprints (outward-facing walls). Upgrade in its own commit: rebuild the snapshot set on the new version before refactoring anything, explain every difference against the old set (and re-run the simulated parity test), then use the new set as the baseline for the code changes that follow.
+
+## Typing finds real bugs
+
+- Typing documents for every supported release (plan task 12) showed that epinterface wrote one release's field names for infiltration and ventilation, so the oldest release it claimed to support had never worked; the support range was corrected instead of the error silenced.
+- A handler typed for the union of the object types it filters (building surfaces, windows, internal masses) read fields some of those types lack. It only worked because every configuration skipped those filters for windows and internal masses; any other configuration raised `InvalidFieldError` mid-build. Dispatch on the type (one collection per group), and refuse configurations that cannot apply.
+- Treat each such finding as its own reviewed change. Never paper over one with `# pyright: ignore` or a cast.
+
 ## Process traps
 
 - "Pre-existing" lint failures must be checked against the main branch, not against an earlier commit of the migration branch. New fixtures and formatter-version churn are the usual offenders; exclude fixture directories from file-rewriting hooks.
 - A newer local `ruff` than the pre-commit pin reformats files differently; format through `pre-commit`, not the venv's ruff.
 - An implementer may spawn its own reviewers or report the same result repeatedly: stop finished agents.
 - Pin idfkit to the minor series the parity gate ran on.
+- Leave versioning to the maintainers: write the changelog under `Unreleased` and do not bump the package version or name a release (one migration branch bumped it to 2.0.0 and had to revert it).
