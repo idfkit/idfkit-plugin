@@ -25,6 +25,7 @@ Claude Code, Cursor, Copilot, Gemini, Codex, and any MCP-capable client.
 |---|---|
 | **MCP server** (`uvx idfkit-mcp@<version>`, pinned in `.mcp.json`) | Tools and `idfkit://…` resources to load, query, edit, validate, and simulate IDF / epJSON models. |
 | **`developing-with-idfkit` skill** | Discovers the idfkit installed in your project and loads **version-matched** reference docs for writing Python against the library. |
+| **`migrating-to-idfkit` skill** | Ports a Python codebase from archetypal, eppy or geomeppy to idfkit's native API without silently changing results: inventory, consumer contract, a regression baseline captured under the old stack, then a staged port. Builds on `developing-with-idfkit` and the superpowers process skills. |
 | **Workflow skills** | Task playbooks that orchestrate the MCP tools: `simulate`, `validate`, `new-model`, `load-model`, `energy-audit`, `weather`, `upgrade-version`, `idf-conventions`, `docs`. |
 | **Agents** | Focused sub-agents: `energy-modeler`, `envelope-analyst`, `hvac-designer`. |
 | **Commands & hooks** | `/quick-sim` slash command; context hooks that nudge agents toward the structured MCP tools when they touch `.idf` / `.epJSON` / `.epw` / `.ddy` files. |
