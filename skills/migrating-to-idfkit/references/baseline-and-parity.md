@@ -35,7 +35,7 @@ Run the capture with a fixed `PYTHONHASHSEED` and confirm order-sensitive object
 
 For changes after parity that should not alter the written model at all (retiring mirror classes, renames, moving writers between modules), the simulation tolerance is too loose a gate. Before touching code, write a script that builds every model the tests build, plus variants that reach the writers the plain configurations skip (systems off, natural ventilation, economizers, heat recovery, conditioned basements and attics), without simulating, and writes each with `idfkit.write_idf(doc)` (sorted order) for the oldest and newest supported EnergyPlus versions. Run it twice to confirm it is deterministic. After every step, rebuild and `diff -r`: it must be empty. Fix the port on any difference, never the snapshot. To confirm the snapshots really came from the old code, regenerate them from the old commit at the end and compare again. Note the branches the variants do not reach.
 
-After an idfkit upgrade, rebuild the snapshot set on the new version before using it as a gate: the writer itself may have changed (see `pitfalls.md`, *Upgrading idfkit mid-migration*).
+After an idfkit upgrade, rebuild the snapshot set on the new version before using it as a gate: the written IDF may have changed (see `pitfalls.md`, *Upgrading idfkit mid-migration*).
 
 ## Benchmarking at the end
 
